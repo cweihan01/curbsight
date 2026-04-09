@@ -4,3 +4,16 @@
 
 # Ultralytics output
 runs/
+
+# Data (videos)
+*.mp4
+*.MOV
+*.avi
+*.mkv
+*.webm
+*.flv
+*.wmv
+*.m4v
+*.m4a
+*.m4b
+*.m4p
