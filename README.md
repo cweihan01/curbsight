@@ -1,13 +1,13 @@
 # Curbsight
 
-Ultralytics YOLO–based tooling: **preprocessing** helpers for video, **`parking_management.py`** for **parking-slot occupancy** using `bounding_boxes.json`, and **`vehicle_detection.py`** for plain vehicle detection.
+Ultralytics YOLO-based tooling for parking analysis: **preprocessing** and optional **augmentation** helpers for video, with **`parking_management.py`** as the main script for **parking-slot occupancy** using `bounding_boxes.json`. The older **`vehicle_detection.py`** utility is kept for occasional quick experiments.
 
 ## Requirements
 
 - Python 3.10+
 - Webcam or media files for input
 
-## Install
+## Installation
 
 ```bash
 cd curbsight
@@ -29,33 +29,21 @@ On first run, YOLO weights (default `yolo26n.pt`) download automatically (if not
 
 ## Preprocessing
 
-These scripts only reshape and sample the input video file. Use them before you annotate parking regions or run the parking pipeline so resolution and framing stay consistent.
+Preprocessing is the necessary preparation of raw video before annotation/inference. It should eventually be part of the standard pipeline given a video feed.
 
-| Script             | Role                                                        |
-| ------------------ | ----------------------------------------------------------- |
-| `trim_video.py`    | Keep a time range from a long file                          |
-| `crop_video.py`    | Crop every frame (e.g. remove a bottom bar)                 |
-| `extract_frame.py` | Save one frame as an image (e.g. for drawing slot polygons) |
+| Script                                 | Role                                                        |
+| -------------------------------------- | ----------------------------------------------------------- |
+| [`trim_video.py`](#trim_videopy)       | Keep a time range from a long file                          |
+| [`crop_video.py`](#crop_videopy)       | Crop every frame (e.g. remove a bottom bar)                 |
+| [`extract_frame.py`](#extract_framepy) | Save one frame as an image (e.g. for drawing slot polygons) |
 
 ### Order when building the parking pipeline
 
 Run preprocessing in this order:
 
-1. **`trim_video.py`** — Shorten the clip (time and file size).
-2. **`crop_video.py`** — Drop fixed regions so pixels match what you will analyze.
-3. **`extract_frame.py`** — Grab a still from the **cropped** video; use it to define polygons at the same width/height as the cropped clip.
-
-Then define regions by running the following command to open the parking points selection tool:
-
-```python
-from ultralytics import solutions
-solutions.ParkingPtsSelection()
-# This will bring up a GUI.
-# Upload the image that is a frame from the preprocessed video,
-# and save the bounding boxes to the file `bounding_boxes.json`.
-```
-
-Finally, we can run the parking occupancy script `parking_management.py`.
+1. **`trim_video.py`**: Shorten the clip (time and file size).
+2. **`crop_video.py`**: Drop fixed regions so pixels match what you will analyze.
+3. **`extract_frame.py`**: Grab a still from the **final preprocessed** video; use it to define polygons at the same width/height as that clip.
 
 ### Example preprocessing commands
 
@@ -66,7 +54,7 @@ python trim_video.py data/raw.MOV --start 120 --duration 180 -o data/clip.mp4
 # Remove 200 px from the bottom of every frame
 python crop_video.py data/clip.mp4 --remove-bottom 200 -o data/clip_cropped.mp4
 
-# Save frame 100 (0-based) for annotating parking slots
+# Save frame 100 (0-based) for annotating parking spots
 python extract_frame.py data/clip_cropped.mp4 -f 100 -o data/reference_frame.jpg
 ```
 
@@ -109,11 +97,53 @@ python extract_frame.py data/clip_cropped.mp4 -f 0 -o data/reference_frame.jpg
 
 Full help: `python extract_frame.py -h`.
 
-## Parking occupancy
+### Define Parking Regions
+
+The parking regions are defined by the bounding boxes of the parking spots.
+
+After extracting a frame from the preprocessed video, run the following command to open the parking points selection tool:
+
+```python
+from ultralytics import solutions
+solutions.ParkingPtsSelection()
+# This will bring up a GUI.
+# Upload the image that is a frame from the preprocessed video,
+# and save the bounding boxes to the file `bounding_boxes.json`.
+```
+
+Next, optionally run some augmentation techniques on the preprocessed video and then run the parking occupancy script `parking_management.py`.
+
+## Augmentation
+
+Augmentation is optional dataset tuning to better resemble real-world operating conditions. Unlike [preprocessing](#preprocessing), augmentation is not required for the core pipeline to run on an input feed. It is suggested to run various augmentation techniques with varying parameters (e.g. different pixelation levels) on the input video before running the parking occupancy script `parking_management.py`.
+
+| Script                                   | Role                                           |
+| ---------------------------------------- | ---------------------------------------------- |
+| [`pixelate_video.py`](#pixelate_videopy) | Mimic low-res/compressed street-camera footage |
+
+### `pixelate_video.py`
+
+Downsamples each frame, then upscales with nearest-neighbor interpolation to make it look more pixelated.
+Optionally adds JPEG artifacts and lowers FPS to better mimic real-world street cameras.
+
+```bash
+# Pixelate to 30% of the original resolution
+python pixelate_video.py data/clip_cropped.mp4 --scale 0.3 -o data/clip_pixelated.mp4
+
+# Downsample to 640 pixels wide and add JPEG artifacts
+python pixelate_video.py data/clip.mp4 --target-width 640 --jpeg-quality 35 -o data/clip_cctv.mp4
+
+# Downsample to 15% of the original resolution and 50% of the original FPS
+python pixelate_video.py data/clip.mp4 --scale 0.15 --fps-scale 0.5 -o data/clip_cctv.mp4
+```
+
+Full help: `python pixelate_video.py -h`.
+
+## Parking Occupancy Detection
 
 **`parking_management.py`** estimates **which parking spaces are occupied**: it runs a YOLO model together with **polygon regions** in `bounding_boxes.json` and overlays occupancy on the video, outputting a new video with the occupancy.
 
-Prepare footage with **Preprocessing** above, then export or edit `bounding_boxes.json` (see [Ultralytics parking management](https://docs.ultralytics.com/guides/parking-management/)):
+Prepare footage with **[Preprocessing](#preprocessing)** and optionally **[Augmentation](#augmentation)** above, then export the bounding boxes to `bounding_boxes.json` (see [Ultralytics parking management](https://docs.ultralytics.com/guides/parking-management/)):
 
 ```bash
 python -c "from ultralytics import solutions; solutions.ParkingPtsSelection()"
@@ -143,11 +173,12 @@ Example commands:
 # Basic usage: process a video and save the output with overlaid occupancy results to data/parking_out.mp4
 python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4
 
+# Process every 10th frame (output video will remains the same duration as the input video)
+# This is recommended for faster processing (less inferences)
+python parking_management.py data/clip_cropped.mp4 --stride 10
+
 # Use a custom bounding box JSON file
 python parking_management.py data/clip_cropped.mp4 -j bounding_boxes.json
-
-# Process every 10th frame (output video will remains the same duration as the input video)
-python parking_management.py data/clip_cropped.mp4 --stride 10
 
 # Restrict detection to certain vehicle classes (car, motorcycle, bus, truck)
 python parking_management.py data/clip_cropped.mp4 --classes 2,3,5,7
@@ -161,18 +192,20 @@ Full help: `python parking_management.py -h`.
 ### End-to-end parking example (after preprocessing)
 
 ```bash
-python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --stride 60
+python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --stride 10
 ```
 
-## Vehicle detection
+## Vehicle Detection
 
-**`vehicle_detection.py`** is for **detecting vehicles only**: YOLO on an image, video, folder, URL, or webcam with **bounding boxes** for COCO vehicle classes (car, motorcycle, bus, truck). It does **not** read `bounding_boxes.json` and does **not** report per-slot occupancy—use **Parking occupancy** above for that.
+**`vehicle_detection.py`** is a legacy utility and is no longer part of the main workflow. We now use **`parking_management.py`** for parking-slot occupancy as the primary pipeline.
+
+If needed for quick experiments, `vehicle_detection.py` runs YOLO vehicle detection only (car, motorcycle, bus, truck) on an image, video, folder, URL, or webcam. It does **not** read `bounding_boxes.json` and does **not** report per-spot occupancy.
 
 ### `vehicle_detection.py`
 
 ```bash
 python vehicle_detection.py
-python vehicle_detection.py data/ralphs1.jpg --save --save-txt --save-conf
+python vehicle_detection.py data/frame.jpg --save --save-txt --save-conf
 python vehicle_detection.py --show
 python vehicle_detection.py path/to/video.mp4 --save
 python vehicle_detection.py https://ultralytics.com/images/bus.jpg
@@ -189,3 +222,11 @@ Useful options:
 | `--conf 0.25`                  | Confidence threshold                     |
 
 Full flags: `python vehicle_detection.py -h`.
+
+## Resources
+
+Object detection documentation:
+https://docs.ultralytics.com/tasks/detect/
+
+List of classes:
+https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/datasets/coco.yaml
