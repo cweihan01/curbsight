@@ -87,6 +87,10 @@ def main() -> int:
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     total_sec = frame_count / fps if frame_count > 0 else None
+    print(
+        f"[trim] Input: {src} | size={w}x{h} | fps={fps:.3f} | "
+        f"frames={frame_count if frame_count > 0 else 'unknown'}"
+    )
 
     if args.middle is not None:
         if args.middle <= 0:
@@ -125,6 +129,10 @@ def main() -> int:
         print("No frames to write (check --start / --end / --duration).", file=sys.stderr)
         cap.release()
         return 1
+    print(
+        f"[trim] Requested range: {start_sec:.2f}s to {end_sec:.2f}s "
+        f"(frames {start_frame}-{end_frame - 1}, total {n_frames} frame(s))"
+    )
 
     out = args.out
     if out is None:
@@ -142,6 +150,7 @@ def main() -> int:
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, float(start_frame))
     written = 0
+    progress_every = max(1, int(round(fps * 5)))  # print roughly every 5 seconds
     try:
         for _ in range(n_frames):
             ok, frame = cap.read()
@@ -149,6 +158,12 @@ def main() -> int:
                 break
             writer.write(frame)
             written += 1
+            if written % progress_every == 0 or written == n_frames:
+                pct = (written / n_frames) * 100
+                print(
+                    f"[trim] Progress: {written}/{n_frames} frame(s) "
+                    f"({written / fps:.1f}s, {pct:.1f}%)"
+                )
     finally:
         cap.release()
         writer.release()

@@ -86,6 +86,11 @@ def main() -> int:
     fps = float(cap.get(cv2.CAP_PROP_FPS))
     if fps <= 0:
         fps = 30.0
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(
+        f"[crop] Input: {src} | size={w}x{h} | fps={fps:.3f} | "
+        f"frames={frame_count if frame_count > 0 else 'unknown'}"
+    )
 
     t, b, l, r = args.remove_top, args.remove_bottom, args.remove_left, args.remove_right
     if t + b + l + r <= 0:
@@ -106,6 +111,10 @@ def main() -> int:
         )
         cap.release()
         return 1
+    print(
+        f"[crop] Crop settings: top={t}, bottom={b}, left={l}, right={r} "
+        f"-> output size={x1 - x0}x{y1 - y0}"
+    )
 
     out = args.out
     if out is None:
@@ -122,6 +131,8 @@ def main() -> int:
         cap.release()
         return 1
 
+    processed = 0
+    progress_every = max(1, int(round(fps * 5)))  # print roughly every 5 seconds
     try:
         while True:
             ok, frame = cap.read()
@@ -129,11 +140,21 @@ def main() -> int:
                 break
             cropped = frame[y0:y1, x0:x1]
             writer.write(cropped)
+            processed += 1
+            if processed % progress_every == 0:
+                if frame_count > 0:
+                    pct = (processed / frame_count) * 100
+                    print(
+                        f"[crop] Progress: {processed}/{frame_count} frame(s) "
+                        f"({processed / fps:.1f}s, {pct:.1f}%)"
+                    )
+                else:
+                    print(f"[crop] Progress: {processed} frame(s) ({processed / fps:.1f}s)")
     finally:
         cap.release()
         writer.release()
 
-    print(f"Wrote {cw}x{ch} @ {fps:.3f} fps: {out}")
+    print(f"[crop] Done: wrote {processed} frame(s), {cw}x{ch} @ {fps:.3f} fps -> {out}")
     return 0
 
 
