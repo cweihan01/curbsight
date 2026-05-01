@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any, Callable
 
 import cv2
 
@@ -132,8 +133,14 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
+def run_parking_management(
+    args: argparse.Namespace,
+    on_update: Callable[[dict[str, Any]], None] | None = None,
+) -> int:
+    """Run parking management pipeline.
+
+    Optional on_update callback receives lightweight per-inference metadata.
+    """
     try:
         from ultralytics import solutions
     except ImportError:
@@ -162,6 +169,11 @@ def main() -> int:
     fps = float(cap.get(cv2.CAP_PROP_FPS))
     if fps <= 0:
         fps = 30.0
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(
+        f"[parking] Input: {args.source!r} | size={w}x{h} | fps={fps:.3f} | "
+        f"frames={frame_count if frame_count > 0 else 'unknown'}"
+    )
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_path = args.out
@@ -189,11 +201,16 @@ def main() -> int:
     if args.line_width is not None:
         pm_kwargs["line_width"] = args.line_width
 
+    print(
+        f"[parking] Config: stride={args.stride}, conf={args.conf}, iou={args.iou}, "
+        f"tracker={args.tracker}, weights={args.weights}, json={json_path}"
+    )
     parking = solutions.ParkingManagement(**pm_kwargs)
 
     last_plot = None
     index = 0
     infer_count = 0
+    progress_every = max(1, int(round(fps * 5)))  # print roughly every 5 seconds
     try:
         while cap.isOpened():
             ret, im0 = cap.read()
@@ -203,8 +220,29 @@ def main() -> int:
                 results = parking(im0)
                 last_plot = results.plot_im
                 infer_count += 1
+                if on_update is not None:
+                    on_update(
+                        {
+                            "frame_index": index,
+                            "inference_index": infer_count,
+                            "stride": args.stride,
+                        }
+                    )
             writer.write(last_plot)
             index += 1
+            # Print progress roughly every 5 seconds
+            if index % progress_every == 0:
+                if frame_count > 0:
+                    pct = (index / frame_count) * 100
+                    print(
+                        f"[parking] Progress: {index}/{frame_count} frame(s) "
+                        f"({index / fps:.1f}s, {pct:.1f}%) | inferences={infer_count}"
+                    )
+                else:
+                    print(
+                        f"[parking] Progress: {index} frame(s) ({index / fps:.1f}s) "
+                        f"| inferences={infer_count}"
+                    )
             if args.max_frames is not None and index >= args.max_frames:
                 break
     finally:
@@ -213,8 +251,16 @@ def main() -> int:
         if args.show:
             cv2.destroyAllWindows()
 
-    print(f"Wrote: {out_path.resolve()} ({index} frames, {infer_count} inferences, stride={args.stride})")
+    print(
+        f"[parking] Done: wrote {index} frame(s), {infer_count} inferences, "
+        f"stride={args.stride} -> {out_path.resolve()}"
+    )
     return 0
+
+
+def main() -> int:
+    args = parse_args()
+    return run_parking_management(args)
 
 
 if __name__ == "__main__":
