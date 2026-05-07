@@ -4,6 +4,7 @@
 
 # Ultralytics output
 runs/
+*.jsonl
 
 # Data (videos)
 *.mp4

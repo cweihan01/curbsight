@@ -22,14 +22,20 @@ Full help:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 import cv2
+from ultralytics import solutions
+from ultralytics.solutions.solutions import SolutionResults
 
 DEFAULT_WEIGHTS = "yolo26n.pt"
 DEFAULT_JSON = Path(__file__).resolve().parent / "bounding_boxes.json"
+DEFAULT_SOURCE_ID = "ralphs_garage"
+DEFAULT_STREET_ID = "le_conte_ave"
 
 
 def parse_classes(s: str | None) -> list[int] | None:
@@ -42,6 +48,43 @@ def open_capture(source: str) -> cv2.VideoCapture:
     cap_src: str | int = int(source) if source.isdigit() else source
     cap = cv2.VideoCapture(cap_src)
     return cap
+
+
+def build_inference_event(
+    *,
+    frame_index: int,
+    inference_index: int,
+    stride: int,
+    source_id: str,
+    street_id: str,
+    results: SolutionResults,
+) -> dict[str, Any]:
+    """
+    Build a JSON event for the parking management system.
+    """
+    # These are fields from Ultralytics ParkingManagement's SolutionResults object
+    occupied_spots = results.filled_slots
+    available_spots = results.available_slots
+    total_tracks = results.total_tracks
+
+    total_spots = occupied_spots + \
+        available_spots if occupied_spots is not None and available_spots is not None else None
+    occupancy_ratio = occupied_spots / \
+        total_spots if total_spots is not None and total_spots > 0 else None
+
+    return {
+        "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+        "source_id": source_id,
+        "street_id": street_id,
+        "frame_index": frame_index,
+        "inference_index": inference_index,
+        "stride": stride,
+        "occupied_spots": occupied_spots,
+        "available_spots": available_spots,
+        "total_spots": total_spots,
+        "occupancy_ratio": occupancy_ratio,
+        "total_tracks": total_tracks,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -130,6 +173,21 @@ def parse_args() -> argparse.Namespace:
         metavar="M",
         help="Stop after M frames (optional; useful for quick tests).",
     )
+    p.add_argument(
+        "--events-out",
+        type=Path,
+        default=Path("parking_events.jsonl"),
+        help="File to write per-inference JSON events here for backend ingestion to"
+        "(default: parking_events.jsonl).",
+    )
+    p.add_argument(
+        "--publish-every",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Write one event every N inferences (default: 1). If used with --stride X, "
+        "the event will be written every Xth frame.",
+    )
     return p.parse_args()
 
 
@@ -141,12 +199,6 @@ def run_parking_management(
 
     Optional on_update callback receives lightweight per-inference metadata.
     """
-    try:
-        from ultralytics import solutions
-    except ImportError:
-        print("Install dependencies: pip install -r requirements.txt", file=sys.stderr)
-        return 1
-
     json_path = args.json.resolve()
     if not json_path.is_file():
         print(f"JSON not found: {json_path}", file=sys.stderr)
@@ -157,6 +209,9 @@ def run_parking_management(
         return 1
     if args.max_frames is not None and args.max_frames < 1:
         print("--max-frames must be >= 1.", file=sys.stderr)
+        return 1
+    if args.publish_every < 1:
+        print("--publish-every must be >= 1.", file=sys.stderr)
         return 1
 
     cap = open_capture(args.source)
@@ -183,6 +238,16 @@ def run_parking_management(
         print(f"Error opening video writer: {out_path}", file=sys.stderr)
         cap.release()
         return 1
+    events_out_path = args.events_out
+    events_out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        events_file = events_out_path.open("w", encoding="utf-8")
+    except OSError as e:
+        print(
+            f"Error opening events output file: {events_out_path} ({e})", file=sys.stderr)
+        cap.release()
+        writer.release()
+        return 1
 
     classes = parse_classes(args.classes)
     pm_kwargs: dict = {
@@ -205,6 +270,10 @@ def run_parking_management(
         f"[parking] Config: stride={args.stride}, conf={args.conf}, iou={args.iou}, "
         f"tracker={args.tracker}, weights={args.weights}, json={json_path}"
     )
+    print(
+        f"[parking] Events: out={events_out_path.resolve()} | publish_every={args.publish_every} "
+        f"| source_id={DEFAULT_SOURCE_ID} | street_id={DEFAULT_STREET_ID}"
+    )
     parking = solutions.ParkingManagement(**pm_kwargs)
 
     last_plot = None
@@ -220,14 +289,19 @@ def run_parking_management(
                 results = parking(im0)
                 last_plot = results.plot_im
                 infer_count += 1
+                event = build_inference_event(
+                    frame_index=index,
+                    inference_index=infer_count,
+                    stride=args.stride,
+                    source_id=DEFAULT_SOURCE_ID,
+                    street_id=DEFAULT_STREET_ID,
+                    results=results,
+                )
+                if infer_count % args.publish_every == 0:
+                    events_file.write(json.dumps(event) + "\n")
+                    events_file.flush()
                 if on_update is not None:
-                    on_update(
-                        {
-                            "frame_index": index,
-                            "inference_index": infer_count,
-                            "stride": args.stride,
-                        }
-                    )
+                    on_update(event)
             writer.write(last_plot)
             index += 1
             # Print progress roughly every 5 seconds
@@ -248,6 +322,7 @@ def run_parking_management(
     finally:
         cap.release()
         writer.release()
+        events_file.close()
         if args.show:
             cv2.destroyAllWindows()
 
