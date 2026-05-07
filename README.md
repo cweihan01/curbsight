@@ -151,30 +151,34 @@ python -c "from ultralytics import solutions; solutions.ParkingPtsSelection()"
 
 ### `parking_management.py`
 
-Run the script to get the occupancy of the parking spaces.
+Run the script to get the occupancy of the parking spaces. The script will output a video with the occupancy of the parking spaces, and a JSONL file with per-inference events for backend ingestion.
 
 The default JSON file containing the polygon regions bounding boxes is `bounding_boxes.json`.
-The default output is `parking_management_out.mp4` in the current working directory.
+The default video output is `parking_management_out.mp4` in the current working directory.
+The default event output is `parking_events.jsonl` in the current working directory.
 
 Useful script arguments:
 | Option | Description |
 | ------------------------------ | ---------------------------------------- |
 | `--show` | Open a preview window; if omitted, results are saved to an output video file |
 | `--iou <iou_threshold>` | IoU threshold for object detection |
-| `--out <output_file_path>` | Save the output to the specified file path |
-| `--json <json_file_path>` | Use a custom bounding box JSON file |
+| `--out <output_file_path>` | Save the output to the specified file path (default `parking_management_out.mp4`) |
+| `--json <json_file_path>` | Use a custom bounding box JSON file (default `bounding_boxes.json`) |
 | `--classes <classes>` | Restrict detection to certain vehicle classes |
-| `--stride <stride>` | Process every Nth frame |
+| `--stride <N>` | Process every Nth frame (default `1`) |
 | `--no-verbose` | Disable verbose output |
+| `--events-out <path>` | Write per-inference JSON events to a `.jsonl` file (default `parking_events.jsonl`) |
+| `--publish-every <N>` | Emit one JSON event every N inferences (default `1`). If used with `--stride <X>`, the event will be published every X\*Nth frame. |
 
 Example commands:
 
 ```bash
-# Basic usage: process a video and save the output with overlaid occupancy results to data/parking_out.mp4
-python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4
+# Basic usage: process a video and save the video output with overlaid occupancy results to parking_out.mp4
+# and stream per-inference availability events to parking_events.jsonl
+python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl
 
-# Process every 10th frame (output video will remains the same duration as the input video)
-# This is recommended for faster processing (less inferences)
+# Process every 10th frame (output video will remain the same duration as the input video)
+# This is recommended for faster processing (fewer inferences)
 python parking_management.py data/clip_cropped.mp4 --stride 10
 
 # Use a custom bounding box JSON file
@@ -192,7 +196,7 @@ Full help: `python parking_management.py -h`.
 ### End-to-end parking example (after preprocessing)
 
 ```bash
-python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --stride 10
+python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl --stride 10
 ```
 
 ## Vehicle Detection

@@ -1,5 +1,6 @@
 """
-Parking occupancy on video using Ultralytics ParkingManagement and polygon regions in JSON.
+Parking occupancy on video using Ultralytics ParkingManagement and polygon regions in JSON,
+with streaming of per-inference availability events for backend ingestion.
 
 Regions default to bounding_boxes.json next to this script. Use --stride to infer only every Nth
 frame and reuse the last overlay in between (faster; same output duration as the source).
@@ -8,9 +9,13 @@ Typical order (see README.md): trim_video → crop_video → extract_frame → d
 bounding_boxes.json (e.g. via Ultralytics ParkingPtsSelection on the extracted still) → run this
 on the cropped clip.
 
+This script produces:
+- An annotated output video with per-spot occupancy overlays.
+- A JSONL stream of per-inference events (see --events-out / --publish-every).
+
 Run:
 
-  python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4
+  python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --events-out parking_events.jsonl --stride 10
   python parking_management.py data/clip_cropped.mp4 --stride 5 --no-verbose
   python parking_management.py data/clip_cropped.mp4 -j bounding_boxes.json --classes 2,3,5,7
 
@@ -39,12 +44,14 @@ DEFAULT_STREET_ID = "le_conte_ave"
 
 
 def parse_classes(s: str | None) -> list[int] | None:
+    """Parse comma-separated list of COCO class ids to track."""
     if not s or not s.strip():
         return None
     return [int(x.strip()) for x in s.split(",") if x.strip()]
 
 
 def open_capture(source: str) -> cv2.VideoCapture:
+    """Open a video capture from a source (path, index, or URL)."""
     cap_src: str | int = int(source) if source.isdigit() else source
     cap = cv2.VideoCapture(cap_src)
     return cap
@@ -61,6 +68,33 @@ def build_inference_event(
 ) -> dict[str, Any]:
     """
     Build a JSON event for the parking management system.
+
+    Args:
+        frame_index: The index of the frame in the video (0-indexed).
+        inference_index: The index of the inference (1-indexed). This does not equal the frame_index if stride > 1.
+        stride: Number of frames between inferences.
+        source_id: The id of the source.
+        street_id: The id of the street.
+        results: The results of the inference (SolutionResults object from ParkingManagement.process()).
+
+    Returns:
+        A dictionary containing the event data.
+        Example:
+        ```json
+        {
+            "timestamp_iso": "2026-05-07T05:59:05.888053+00:00",
+            "source_id": "ralphs_garage",
+            "street_id": "le_conte_ave",
+            "frame_index": 20,
+            "inference_index": 3,
+            "stride": 10,
+            "occupied_spots": 6,
+            "available_spots": 4,
+            "total_spots": 10,
+            "occupancy_ratio": 0.6,
+            "total_tracks": 6
+        }
+        ```
     """
     # These are fields from Ultralytics ParkingManagement's SolutionResults object
     occupied_spots = results.filled_slots
@@ -88,6 +122,7 @@ def build_inference_event(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     p = argparse.ArgumentParser(
         description="Run Ultralytics ParkingManagement on video using bounding_boxes.json."
     )
@@ -163,8 +198,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         metavar="N",
-        help="Run the model every N frames (default: 1). Between runs, the last annotated frame "
-        "is written again so length and FPS match the input.",
+        help="Run the model every N frames (default: 1), i.e. an inference is run every "
+        "N frames. Between inferences, the last annotated frame from the previous inference "
+        "is duplicated so the output video length and FPS match the input.",
     )
     p.add_argument(
         "--max-frames",
@@ -185,8 +221,8 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         metavar="N",
-        help="Write one event every N inferences (default: 1). If used with --stride X, "
-        "the event will be written every Xth frame.",
+        help="Write one event every N inferences (default: 1). If used with --stride <X>, "
+        "the event will be written every X*Nth frame.",
     )
     return p.parse_args()
 
@@ -195,15 +231,20 @@ def run_parking_management(
     args: argparse.Namespace,
     on_update: Callable[[dict[str, Any]], None] | None = None,
 ) -> int:
-    """Run parking management pipeline.
-
-    Optional on_update callback receives lightweight per-inference metadata.
     """
+    Run parking management pipeline.
+
+    Args:
+        args: Command line arguments.
+        on_update: Optional callback to receive per-inference event data.
+    """
+    # Resolve the bounding boxes JSON file path
     json_path = args.json.resolve()
     if not json_path.is_file():
         print(f"JSON not found: {json_path}", file=sys.stderr)
         return 1
 
+    # Validate arguments
     if args.stride < 1:
         print("--stride must be >= 1.", file=sys.stderr)
         return 1
@@ -214,11 +255,13 @@ def run_parking_management(
         print("--publish-every must be >= 1.", file=sys.stderr)
         return 1
 
+    # Open the input video source
     cap = open_capture(args.source)
     if not cap.isOpened():
         print(f"Error opening video source: {args.source!r}", file=sys.stderr)
         return 1
 
+    # Get the input video properties
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = float(cap.get(cv2.CAP_PROP_FPS))
@@ -230,6 +273,7 @@ def run_parking_management(
         f"frames={frame_count if frame_count > 0 else 'unknown'}"
     )
 
+    # Open the output video writer
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_path = args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -238,6 +282,8 @@ def run_parking_management(
         print(f"Error opening video writer: {out_path}", file=sys.stderr)
         cap.release()
         return 1
+
+    # Open the events output file
     events_out_path = args.events_out
     events_out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -249,6 +295,7 @@ def run_parking_management(
         writer.release()
         return 1
 
+    # Build the ParkingManagement configs
     classes = parse_classes(args.classes)
     pm_kwargs: dict = {
         "model": args.weights,
@@ -274,6 +321,7 @@ def run_parking_management(
         f"[parking] Events: out={events_out_path.resolve()} | publish_every={args.publish_every} "
         f"| source_id={DEFAULT_SOURCE_ID} | street_id={DEFAULT_STREET_ID}"
     )
+
     parking = solutions.ParkingManagement(**pm_kwargs)
 
     last_plot = None
@@ -281,11 +329,15 @@ def run_parking_management(
     infer_count = 0
     progress_every = max(1, int(round(fps * 5)))  # print roughly every 5 seconds
     try:
+        # Main loop for each frame in the input video
         while cap.isOpened():
             ret, im0 = cap.read()
             if not ret:
                 break
+
+            # Run the ParkingManagement model on the frame every N frames according to the stride
             if index % args.stride == 0 or last_plot is None:
+                # Run inference on this frame and build the event data
                 results = parking(im0)
                 last_plot = results.plot_im
                 infer_count += 1
@@ -297,14 +349,21 @@ def run_parking_management(
                     street_id=DEFAULT_STREET_ID,
                     results=results,
                 )
+
+                # Write the event data to the output JSONL file every N inferences according to publish_every
                 if infer_count % args.publish_every == 0:
                     events_file.write(json.dumps(event) + "\n")
                     events_file.flush()
+
+                # Callback to receive the event data
                 if on_update is not None:
                     on_update(event)
+
+            # Write the annotated frame to the output video
             writer.write(last_plot)
-            index += 1
+
             # Print progress roughly every 5 seconds
+            index += 1
             if index % progress_every == 0:
                 if frame_count > 0:
                     pct = (index / frame_count) * 100
@@ -317,6 +376,8 @@ def run_parking_management(
                         f"[parking] Progress: {index} frame(s) ({index / fps:.1f}s) "
                         f"| inferences={infer_count}"
                     )
+
+            # Stop after the maximum number of frames if specified
             if args.max_frames is not None and index >= args.max_frames:
                 break
     finally:
