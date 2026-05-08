@@ -5,13 +5,17 @@ with streaming of per-inference availability events for backend ingestion.
 Regions default to bounding_boxes.json next to this script. Use --stride to infer only every Nth
 frame and reuse the last overlay in between (faster; same output duration as the source).
 
-Typical order (see README.md): trim_video → crop_video → extract_frame → define regions in
-bounding_boxes.json (e.g. via Ultralytics ParkingPtsSelection on the extracted still) → run this
-on the cropped clip.
-
 This script produces:
 - An annotated output video with per-spot occupancy overlays.
 - A JSONL stream and folder of inferred JPEG frames for each inference (see --events-out / --publish-every / --inferred-frames-dir).
+
+Typical order of scripts (see README.md):
+1. trim_video.py
+2. crop_video.py
+3. pixelate_video.py (optional)
+4. extract_frame.py
+5. define regions in bounding_boxes.json (via Ultralytics ParkingPtsSelection on the extracted frame)
+6. run this script on the cropped clip from step 3
 
 Run:
 
@@ -98,6 +102,7 @@ def build_inference_event(
             "total_spots": 10,
             "occupancy_ratio": 0.6,
             "total_tracks": 6
+            "inferred_image_path": "parking_management_frames/inferred_003_frame_000020.jpg"
         }
         ```
     """
@@ -157,11 +162,6 @@ def parse_args() -> argparse.Namespace:
         help="Output video path (default: parking_management_out.mp4).",
     )
     p.add_argument(
-        "--tracker",
-        default="botsort.yaml",
-        help="Tracker config (default: botsort.yaml).",
-    )
-    p.add_argument(
         "--conf",
         type=float,
         default=0.1,
@@ -179,11 +179,6 @@ def parse_args() -> argparse.Namespace:
         help='Comma-separated COCO class ids to track, e.g. "2,3,5,7" for vehicles. Empty = all.',
     )
     p.add_argument(
-        "--device",
-        default="",
-        help="Inference device: cpu, 0, cuda:0, ... (empty = auto).",
-    )
-    p.add_argument(
         "--no-verbose",
         action="store_true",
         help="Disable tracker/detection console spam.",
@@ -192,12 +187,6 @@ def parse_args() -> argparse.Namespace:
         "--show",
         action="store_true",
         help="Show annotated frames in a window (needs GUI).",
-    )
-    p.add_argument(
-        "--line-width",
-        type=int,
-        default=None,
-        help="Box/line width for visualization (default: auto).",
     )
     p.add_argument(
         "--stride",
@@ -324,7 +313,6 @@ def run_parking_management(
     pm_kwargs: dict = {
         "model": args.weights,
         "json_file": str(json_path),
-        "tracker": args.tracker,
         "conf": args.conf,
         "iou": args.iou,
         "verbose": not args.no_verbose,
@@ -332,14 +320,10 @@ def run_parking_management(
     }
     if classes is not None:
         pm_kwargs["classes"] = classes
-    if args.device:
-        pm_kwargs["device"] = args.device
-    if args.line_width is not None:
-        pm_kwargs["line_width"] = args.line_width
 
     print(
         f"[parking] Config: stride={args.stride}, conf={args.conf}, iou={args.iou}, "
-        f"tracker={args.tracker}, weights={args.weights}, json={json_path}"
+        f"weights={args.weights}, json={json_path}"
     )
     print(
         f"[parking] Events: out={events_out_path.resolve()} | publish_every={args.publish_every} "
