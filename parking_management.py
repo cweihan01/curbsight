@@ -230,37 +230,65 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_parking_management(
-    args: argparse.Namespace,
+    source: str,
+    json_path: Path = DEFAULT_JSON,
+    weights: str = DEFAULT_WEIGHTS,
+    out_path: Path = Path("parking_management_out.mp4"),
+    conf: float = 0.1,
+    iou: float = 0.7,
+    classes_csv: str = "",
+    no_verbose: bool = False,
+    show: bool = False,
+    stride: int = 1,
+    max_frames: int | None = None,
+    events_out_path: Path = Path("parking_events.jsonl"),
+    publish_every: int = 1,
+    inferred_frames_dir: Path = Path("parking_management_frames"),
     on_update: Callable[[dict[str, Any]], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> int:
     """
     Run parking management pipeline.
 
     Args:
-        args: Command line arguments.
+        source: Input video path, URL, or webcam index string.
+        json_path: Path to the bounding boxes JSON file.
+        weights: Path to the YOLO weights file.
+        out_path: Path to the output video file.
+        conf: Confidence threshold for object detection.
+        iou: IoU threshold for object detection.
+        classes_csv: Comma-separated list of COCO class ids to track.
+        no_verbose: Whether to disable verbose output.
+        show: Whether to show the annotated frames in a window.
+        stride: Number of frames between inferences.
+        max_frames: Maximum number of frames to process.
+        events_out_path: Path to the events output JSONL file.
+        publish_every: Number of inferences between events.
+        inferred_frames_dir: Path to the inferred frames directory.
         on_update: Optional callback to receive per-inference event data.
+        should_stop: Optional callback to check if the run should stop.
     """
     # Resolve the bounding boxes JSON file path
-    json_path = args.json.resolve()
+    json_path = json_path.resolve()
     if not json_path.is_file():
         print(f"JSON not found: {json_path}", file=sys.stderr)
         return 1
 
     # Validate arguments
-    if args.stride < 1:
+    if stride < 1:
         print("--stride must be >= 1.", file=sys.stderr)
         return 1
-    if args.max_frames is not None and args.max_frames < 1:
+    if max_frames is not None and max_frames < 1:
         print("--max-frames must be >= 1.", file=sys.stderr)
         return 1
-    if args.publish_every < 1:
+    if publish_every < 1:
         print("--publish-every must be >= 1.", file=sys.stderr)
         return 1
 
     # Open the input video source
-    cap = open_capture(args.source)
+    cap = open_capture(source)
     if not cap.isOpened():
-        print(f"Error opening video source: {args.source!r}", file=sys.stderr)
+        print(f"Error opening video source: {source!r}", file=sys.stderr)
         return 1
 
     # Get the input video properties
@@ -271,13 +299,12 @@ def run_parking_management(
         fps = 30.0
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(
-        f"[parking] Input: {args.source!r} | size={w}x{h} | fps={fps:.3f} | "
+        f"[parking] Input: {source!r} | size={w}x{h} | fps={fps:.3f} | "
         f"frames={frame_count if frame_count > 0 else 'unknown'}"
     )
 
     # Open the output video writer
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_path = args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(out_path), fourcc, fps, (w, h))
     if not writer.isOpened():
@@ -286,7 +313,6 @@ def run_parking_management(
         return 1
 
     # Open the events output file (overwrite or append based on global run behavior)
-    events_out_path = args.events_out
     events_out_path.parent.mkdir(parents=True, exist_ok=True)
     events_file_mode = "w" if OVERWRITE_ON_EACH_RUN else "a"
     try:
@@ -299,7 +325,6 @@ def run_parking_management(
         return 1
 
     # Create the inferred frames directory; clear it if we are overwriting on each run
-    inferred_frames_dir: Path = args.inferred_frames_dir
     inferred_frames_dir.mkdir(parents=True, exist_ok=True)
     if OVERWRITE_ON_EACH_RUN:
         for jpg_path in inferred_frames_dir.glob("*.jpg"):
@@ -309,24 +334,24 @@ def run_parking_management(
                 print(f"Warning: could not delete {jpg_path} ({e})", file=sys.stderr)
 
     # Build the ParkingManagement configs
-    classes = parse_classes(args.classes)
+    classes = parse_classes(classes_csv)
     pm_kwargs: dict = {
-        "model": args.weights,
+        "model": weights,
         "json_file": str(json_path),
-        "conf": args.conf,
-        "iou": args.iou,
-        "verbose": not args.no_verbose,
-        "show": args.show,
+        "conf": conf,
+        "iou": iou,
+        "verbose": not no_verbose,
+        "show": show,
     }
     if classes is not None:
         pm_kwargs["classes"] = classes
 
     print(
-        f"[parking] Config: stride={args.stride}, conf={args.conf}, iou={args.iou}, "
-        f"weights={args.weights}, json={json_path}"
+        f"[parking] Config: stride={stride}, conf={conf}, iou={iou}, "
+        f"weights={weights}, json={json_path}"
     )
     print(
-        f"[parking] Events: out={events_out_path.resolve()} | publish_every={args.publish_every} "
+        f"[parking] Events: out={events_out_path.resolve()} | publish_every={publish_every} "
         f"| source_id={DEFAULT_SOURCE_ID} | street_id={DEFAULT_STREET_ID}"
     )
 
@@ -339,17 +364,22 @@ def run_parking_management(
     try:
         # Main loop for each frame in the input video
         while cap.isOpened():
+            # Check if the run should stop based on the optional callback
+            if should_stop is not None and should_stop():
+                break
+
+            # Read the next frame from the input video
             ret, im0 = cap.read()
             if not ret:
                 break
 
             # Run the ParkingManagement model on the frame every N frames according to the stride
-            if index % args.stride == 0 or last_plot is None:
+            if index % stride == 0 or last_plot is None:
                 # Run inference on this frame and build the event data
                 results = parking(im0)
                 last_plot = results.plot_im
                 infer_count += 1
-                should_publish = infer_count % args.publish_every == 0
+                should_publish = infer_count % publish_every == 0
                 inferred_image_path: Path | None = (
                     None
                     if not should_publish
@@ -359,11 +389,12 @@ def run_parking_management(
                 event = build_inference_event(
                     frame_index=index,
                     inference_index=infer_count,
-                    stride=args.stride,
+                    stride=stride,
                     source_id=DEFAULT_SOURCE_ID,
                     street_id=DEFAULT_STREET_ID,
                     results=results,
-                    inferred_image_path=None if inferred_image_path is None else str(inferred_image_path),
+                    inferred_image_path=None if inferred_image_path is None else str(
+                        inferred_image_path),
                 )
 
                 # Write the event data to the output JSONL file every N inferences according to publish_every
@@ -396,25 +427,40 @@ def run_parking_management(
                     )
 
             # Stop after the maximum number of frames if specified
-            if args.max_frames is not None and index >= args.max_frames:
+            if max_frames is not None and index >= max_frames:
                 break
     finally:
         cap.release()
         writer.release()
         events_file.close()
-        if args.show:
+        if show:
             cv2.destroyAllWindows()
 
     print(
         f"[parking] Done: wrote {index} frame(s), {infer_count} inferences, "
-        f"stride={args.stride} -> {out_path.resolve()}"
+        f"stride={stride} -> {out_path.resolve()}"
     )
     return 0
 
 
 def main() -> int:
     args = parse_args()
-    return run_parking_management(args)
+    return run_parking_management(
+        source=args.source,
+        json_path=args.json,
+        weights=args.weights,
+        out_path=args.out,
+        conf=args.conf,
+        iou=args.iou,
+        classes_csv=args.classes,
+        no_verbose=args.no_verbose,
+        show=args.show,
+        stride=args.stride,
+        max_frames=args.max_frames,
+        events_out_path=args.events_out,
+        publish_every=args.publish_every,
+        inferred_frames_dir=args.inferred_frames_dir,
+    )
 
 
 if __name__ == "__main__":
