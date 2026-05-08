@@ -4,7 +4,6 @@
 
 # Ultralytics output
 runs/
-*.jsonl
 
 # Data (videos)
 *.mp4
@@ -18,3 +17,7 @@ runs/
 *.m4a
 *.m4b
 *.m4p
+
+# Parking Management output
+*.jsonl
+parking_management_frames/

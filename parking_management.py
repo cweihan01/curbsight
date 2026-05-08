@@ -11,7 +11,7 @@ on the cropped clip.
 
 This script produces:
 - An annotated output video with per-spot occupancy overlays.
-- A JSONL stream of per-inference events (see --events-out / --publish-every).
+- A JSONL stream and folder of inferred JPEG frames for each inference (see --events-out / --publish-every / --inferred-frames-dir).
 
 Run:
 
@@ -41,6 +41,10 @@ DEFAULT_WEIGHTS = "yolo26n.pt"
 DEFAULT_JSON = Path(__file__).resolve().parent / "bounding_boxes.json"
 DEFAULT_SOURCE_ID = "ralphs_garage"
 DEFAULT_STREET_ID = "le_conte_ave"
+# Global run behavior:
+# - True: fresh run (clear frames dir + overwrite events file)
+# - False: incremental run (keep frames dir contents + append events file)
+OVERWRITE_ON_EACH_RUN = True
 
 
 def parse_classes(s: str | None) -> list[int] | None:
@@ -65,6 +69,7 @@ def build_inference_event(
     source_id: str,
     street_id: str,
     results: SolutionResults,
+    inferred_image_path: str | None = None,
 ) -> dict[str, Any]:
     """
     Build a JSON event for the parking management system.
@@ -118,6 +123,7 @@ def build_inference_event(
         "total_spots": total_spots,
         "occupancy_ratio": occupancy_ratio,
         "total_tracks": total_tracks,
+        "inferred_image_path": inferred_image_path,
     }
 
 
@@ -224,6 +230,13 @@ def parse_args() -> argparse.Namespace:
         help="Write one event every N inferences (default: 1). If used with --stride <X>, "
         "the event will be written every X*Nth frame.",
     )
+    p.add_argument(
+        "--inferred-frames-dir",
+        type=Path,
+        default=Path("parking_management_frames"),
+        help="Directory to write a unique inferred/annotated JPEG for every "
+        "published event. Default: parking_management_frames/",
+    )
     return p.parse_args()
 
 
@@ -283,17 +296,28 @@ def run_parking_management(
         cap.release()
         return 1
 
-    # Open the events output file
+    # Open the events output file (overwrite or append based on global run behavior)
     events_out_path = args.events_out
     events_out_path.parent.mkdir(parents=True, exist_ok=True)
+    events_file_mode = "w" if OVERWRITE_ON_EACH_RUN else "a"
     try:
-        events_file = events_out_path.open("w", encoding="utf-8")
+        events_file = events_out_path.open(events_file_mode, encoding="utf-8")
     except OSError as e:
         print(
             f"Error opening events output file: {events_out_path} ({e})", file=sys.stderr)
         cap.release()
         writer.release()
         return 1
+
+    # Create the inferred frames directory; clear it if we are overwriting on each run
+    inferred_frames_dir: Path = args.inferred_frames_dir
+    inferred_frames_dir.mkdir(parents=True, exist_ok=True)
+    if OVERWRITE_ON_EACH_RUN:
+        for jpg_path in inferred_frames_dir.glob("*.jpg"):
+            try:
+                jpg_path.unlink()
+            except OSError as e:
+                print(f"Warning: could not delete {jpg_path} ({e})", file=sys.stderr)
 
     # Build the ParkingManagement configs
     classes = parse_classes(args.classes)
@@ -341,6 +365,13 @@ def run_parking_management(
                 results = parking(im0)
                 last_plot = results.plot_im
                 infer_count += 1
+                should_publish = infer_count % args.publish_every == 0
+                inferred_image_path: Path | None = (
+                    None
+                    if not should_publish
+                    else inferred_frames_dir
+                    / f"inferred_{infer_count:03d}_frame_{index:06d}.jpg"
+                )
                 event = build_inference_event(
                     frame_index=index,
                     inference_index=infer_count,
@@ -348,10 +379,13 @@ def run_parking_management(
                     source_id=DEFAULT_SOURCE_ID,
                     street_id=DEFAULT_STREET_ID,
                     results=results,
+                    inferred_image_path=None if inferred_image_path is None else str(inferred_image_path),
                 )
 
                 # Write the event data to the output JSONL file every N inferences according to publish_every
-                if infer_count % args.publish_every == 0:
+                if should_publish:
+                    if inferred_image_path is not None:
+                        cv2.imwrite(str(inferred_image_path), results.plot_im)
                     events_file.write(json.dumps(event) + "\n")
                     events_file.flush()
 
