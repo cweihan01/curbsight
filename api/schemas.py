@@ -1,4 +1,25 @@
+from enum import Enum
+
 from pydantic import BaseModel, Field
+
+
+class HealthResponse(BaseModel):
+    status: str
+
+
+class VideosResponse(BaseModel):
+    filenames: list[str]
+
+
+class InferenceState(str, Enum):
+    running = "running"
+    idle = "idle"
+    started = "started"
+    stopped = "stopped"
+
+
+class InferenceStatusResponse(BaseModel):
+    status: InferenceState
 
 
 # TODO: Make this align with CLI arguments and validation rules

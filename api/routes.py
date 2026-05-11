@@ -5,34 +5,39 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from api import services as svc
-from api.schemas import StartInferenceRequest
+from api.schemas import (
+    HealthResponse,
+    StartInferenceRequest,
+    InferenceStatusResponse,
+    InferenceState,
+    VideosResponse,
+)
 
 router = APIRouter()
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> HealthResponse:
+    return HealthResponse(status="ok")
 
 
 # NOTE: This assumes video files are stored under data/
 @router.get("/videos")
-def list_videos() -> dict[str, list[str]]:
+def list_videos() -> VideosResponse:
     """Available video files to run inference on."""
-    return {"filenames": svc.list_data_videos()}
+    return VideosResponse(filenames=svc.list_data_videos())
 
 
-# TODO: Use Pydantic model for response
 # TODO: Track stopped jobs - return stopped instead of idle if stopped halfway
 @router.get("/inference/status")
-def inference_status() -> dict[str, str]:
+def inference_status() -> InferenceStatusResponse:
     if svc.process_running(svc.inference_process):
-        return {"status": "running"}
-    return {"status": "idle"}
+        return InferenceStatusResponse(status=InferenceState.running)
+    return InferenceStatusResponse(status=InferenceState.idle)
 
 
 @router.post("/inference/start")
-async def start_inference(req: StartInferenceRequest) -> dict[str, str]:
+async def start_inference(req: StartInferenceRequest) -> InferenceStatusResponse:
     if svc.process_running(svc.inference_process):
         raise HTTPException(status_code=409, detail="Inference is already running.")
 
@@ -42,15 +47,15 @@ async def start_inference(req: StartInferenceRequest) -> dict[str, str]:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     svc.spawn_inference(req)
-    return {"status": "started"}
+    return InferenceStatusResponse(status=InferenceState.started)
 
 
 @router.post("/inference/stop")
-async def stop_inference() -> dict[str, str]:
+async def stop_inference() -> InferenceStatusResponse:
     if not svc.process_running(svc.inference_process):
-        return {"status": "idle"}
+        return InferenceStatusResponse(status=InferenceState.idle)
     svc.terminate_inference()
-    return {"status": "stopped"}
+    return InferenceStatusResponse(status=InferenceState.stopped)
 
 
 @router.get("/frames/{image_name}")
