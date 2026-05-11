@@ -7,8 +7,11 @@ from api.schemas import StartInferenceRequest
 
 # Repo root is parent of package `api` (this file lives at api/services.py)
 REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 EVENTS_PATH = REPO_ROOT / "parking_events.jsonl"
 FRAMES_DIR = REPO_ROOT / "parking_management_frames"
+
+VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
 
 inference_process: mp.Process | None = None
 
@@ -17,12 +20,51 @@ def process_running(proc: mp.Process | None) -> bool:
     return proc is not None and proc.is_alive()
 
 
-# TODO: Filepath args should not be passed into run_parking_management
-# from the API (client will not know these paths)
+def list_data_videos() -> list[str]:
+    """Basenames of video files directly under data/."""
+    if not DATA_DIR.is_dir():
+        return []
+    names: list[str] = []
+    for path in DATA_DIR.iterdir():
+        if path.is_file() and path.suffix.lower() in VIDEO_SUFFIXES:
+            names.append(path.name)
+    return sorted(names)
+
+
+def resolve_data_video(filename: str) -> Path:
+    """Resolve a basename under data/; raise ValueError if invalid or missing."""
+    filename = filename.strip()
+    if not filename:
+        raise ValueError("video_filename is required.")
+
+    if filename != Path(filename).name:
+        raise ValueError("Only a base filename is allowed (no paths).")
+
+    filepath = (DATA_DIR / filename).resolve()
+    data_root = DATA_DIR.resolve()
+    try:
+        filepath.relative_to(data_root)
+    except ValueError as exc:
+        raise ValueError("Invalid video path.") from exc
+
+    if not filepath.is_file():
+        raise ValueError(f"Video not found: {filename}")
+    if filepath.suffix.lower() not in VIDEO_SUFFIXES:
+        raise ValueError("Not a supported video file type.")
+
+    return filepath
+
+
 def run_inference_process(req_data: dict[str, object]) -> None:
     req = StartInferenceRequest(**req_data)
+    source_path = resolve_data_video(req.video_filename)
+
+    # Note: json_path is assumed to be constant (reused across any chosen video)
+    # TODO: Might not want to overwrite out_path (video output) and
+    # events_out_path (JSON events output) on each run; may want to write to
+    # new files each run
     run_parking_management(
-        source=req.source,
+        source=str(source_path),
         json_path=Path(req.json_path),
         weights=req.weights,
         out_path=Path(req.out),

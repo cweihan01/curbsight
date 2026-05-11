@@ -3,7 +3,10 @@ from pydantic import BaseModel, Field
 
 # TODO: Make this align with CLI arguments and validation rules
 class StartInferenceRequest(BaseModel):
-    source: str = Field(..., description="Video path")
+    video_filename: str = Field(
+        ...,
+        description="Name of a video file (obtained from GET /videos)",
+    )
     out: str = "parking_management_out.mp4"
     stride: int = 1
     publish_every: int = 1

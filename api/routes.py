@@ -15,6 +15,13 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# NOTE: This assumes video files are stored under data/
+@router.get("/videos")
+def list_videos() -> dict[str, list[str]]:
+    """Available video files to run inference on."""
+    return {"filenames": svc.list_data_videos()}
+
+
 # TODO: Use Pydantic model for response
 # TODO: Track stopped jobs - return stopped instead of idle if stopped halfway
 @router.get("/inference/status")
@@ -28,6 +35,11 @@ def inference_status() -> dict[str, str]:
 async def start_inference(req: StartInferenceRequest) -> dict[str, str]:
     if svc.process_running(svc.inference_process):
         raise HTTPException(status_code=409, detail="Inference is already running.")
+
+    try:
+        svc.resolve_data_video(req.video_filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     svc.spawn_inference(req)
     return {"status": "started"}
