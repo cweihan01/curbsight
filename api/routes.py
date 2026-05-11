@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import FileResponse
 
 from api import services as svc
@@ -16,41 +16,44 @@ from api.schemas import (
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get("/health", status_code=status.HTTP_200_OK)
 def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
 # NOTE: This assumes video files are stored under data/
-@router.get("/videos")
+@router.get("/videos", status_code=status.HTTP_200_OK)
 def list_videos() -> VideosResponse:
     """Available video files to run inference on."""
     return VideosResponse(filenames=svc.list_data_videos())
 
 
 # TODO: Track stopped jobs - return stopped instead of idle if stopped halfway
-@router.get("/inference/status")
+@router.get("/inference/status", status_code=status.HTTP_200_OK)
 def inference_status() -> InferenceStatusResponse:
     if svc.process_running(svc.inference_process):
         return InferenceStatusResponse(status=InferenceState.running)
     return InferenceStatusResponse(status=InferenceState.idle)
 
 
-@router.post("/inference/start")
+@router.post("/inference/start", status_code=status.HTTP_200_OK)
 async def start_inference(req: StartInferenceRequest) -> InferenceStatusResponse:
     if svc.process_running(svc.inference_process):
-        raise HTTPException(status_code=409, detail="Inference is already running.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Inference is already running.",
+        )
 
     try:
         svc.resolve_data_video(req.video_filename)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     svc.spawn_inference(req)
     return InferenceStatusResponse(status=InferenceState.started)
 
 
-@router.post("/inference/stop")
+@router.post("/inference/stop", status_code=status.HTTP_200_OK)
 async def stop_inference() -> InferenceStatusResponse:
     if not svc.process_running(svc.inference_process):
         return InferenceStatusResponse(status=InferenceState.idle)
@@ -58,14 +61,14 @@ async def stop_inference() -> InferenceStatusResponse:
     return InferenceStatusResponse(status=InferenceState.stopped)
 
 
-@router.get("/frames/{image_name}")
+@router.get("/frames/{image_name}", status_code=status.HTTP_200_OK)
 def get_frame(image_name: str) -> FileResponse:
     image_path = (svc.FRAMES_DIR / image_name).resolve()
     frames_root = svc.FRAMES_DIR.resolve()
     if frames_root not in image_path.parents:
-        raise HTTPException(status_code=400, detail="Invalid frame path.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid frame path.")
     if not image_path.is_file():
-        raise HTTPException(status_code=404, detail="Frame not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frame not found.")
     return FileResponse(image_path)
 
 
