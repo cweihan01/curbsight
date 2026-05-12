@@ -28,12 +28,9 @@ def list_videos() -> VideosResponse:
     return VideosResponse(filenames=svc.list_data_videos())
 
 
-# TODO: Track stopped jobs - return stopped instead of idle if stopped halfway
 @router.get("/inference/status", status_code=status.HTTP_200_OK)
 def inference_status() -> InferenceStatusResponse:
-    if svc.process_running(svc.inference_process):
-        return InferenceStatusResponse(status=InferenceState.running)
-    return InferenceStatusResponse(status=InferenceState.idle)
+    return InferenceStatusResponse(status=svc.get_inference_state())
 
 
 @router.post("/inference/start", status_code=status.HTTP_200_OK)
@@ -55,10 +52,9 @@ async def start_inference(req: StartInferenceRequest) -> InferenceStatusResponse
 
 @router.post("/inference/stop", status_code=status.HTTP_200_OK)
 async def stop_inference() -> InferenceStatusResponse:
-    if not svc.process_running(svc.inference_process):
-        return InferenceStatusResponse(status=InferenceState.idle)
-    svc.terminate_inference()
-    return InferenceStatusResponse(status=InferenceState.stopped)
+    if svc.process_running(svc.inference_process):
+        svc.terminate_inference()
+    return InferenceStatusResponse(status=svc.get_inference_state())
 
 
 @router.get("/frames/{image_name}", status_code=status.HTTP_200_OK)
@@ -66,9 +62,11 @@ def get_frame(image_name: str) -> FileResponse:
     image_path = (svc.FRAMES_DIR / image_name).resolve()
     frames_root = svc.FRAMES_DIR.resolve()
     if frames_root not in image_path.parents:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid frame path.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Invalid frame path.")
     if not image_path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frame not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Frame not found.")
     return FileResponse(image_path)
 
 
@@ -94,7 +92,10 @@ async def ws_events(websocket: WebSocket) -> None:
                     await websocket.send_json(payload)
                 else:
                     if not svc.process_running(svc.inference_process):
-                        await websocket.send_json({"type": "status", "state": "idle"})
+                        lifecycle = svc.get_inference_state()
+                        await websocket.send_json(
+                            {"type": "status", "state": lifecycle.value}
+                        )
                     await asyncio.sleep(0.2)
     except WebSocketDisconnect:
         return

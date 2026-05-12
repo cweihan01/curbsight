@@ -3,7 +3,7 @@ from pathlib import Path
 
 from parking_management import run_parking_management
 
-from api.schemas import StartInferenceRequest
+from api.schemas import InferenceState, StartInferenceRequest
 
 # Repo root is parent of package `api` (this file lives at api/services.py)
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -13,11 +13,26 @@ FRAMES_DIR = REPO_ROOT / "parking_management_frames"
 
 VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
 
+# Running inference process; None if not running
 inference_process: mp.Process | None = None
+# True after a running job is terminated by user; set to False on next inference start
+stopped_by_user: bool = False
 
 
 def process_running(proc: mp.Process | None) -> bool:
     return proc is not None and proc.is_alive()
+
+
+def get_inference_state() -> InferenceState:
+    """Current lifecycle state for status polling and WebSocket heartbeats."""
+    global inference_process
+
+    if process_running(inference_process):
+        return InferenceState.running
+    if stopped_by_user:
+        return InferenceState.stopped
+    # Process natural completion or never started
+    return InferenceState.idle
 
 
 def list_data_videos() -> list[str]:
@@ -81,7 +96,9 @@ def run_inference_process(req_data: dict[str, object]) -> None:
 
 def spawn_inference(req: StartInferenceRequest) -> None:
     """Start inference in a daemon child process."""
-    global inference_process
+    global inference_process, stopped_by_user
+
+    stopped_by_user = False
     inference_process = mp.Process(
         target=run_inference_process,
         args=(req.model_dump(),),
@@ -91,9 +108,13 @@ def spawn_inference(req: StartInferenceRequest) -> None:
 
 
 def terminate_inference() -> None:
-    global inference_process
+    global inference_process, stopped_by_user
+
     if not process_running(inference_process):
         return
     assert inference_process is not None
+
+    stopped_by_user = True
     inference_process.terminate()
     inference_process.join(timeout=3.0)
+    inference_process = None

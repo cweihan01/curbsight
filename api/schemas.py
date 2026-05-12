@@ -12,10 +12,10 @@ class VideosResponse(BaseModel):
 
 
 class InferenceState(str, Enum):
-    running = "running"
-    idle = "idle"
-    started = "started"
-    stopped = "stopped"
+    running = "running"  # inference process is running
+    idle = "idle"  # inference process completed naturally, or never started
+    started = "started"  # inference process started
+    stopped = "stopped"  # inference process terminated by user
 
 
 class InferenceStatusResponse(BaseModel):
