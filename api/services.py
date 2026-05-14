@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 EVENTS_PATH = REPO_ROOT / "parking_events.jsonl"
 FRAMES_DIR = REPO_ROOT / "parking_management_frames"
+OUT_PATH = REPO_ROOT / "parking_management_out.mp4"
 
 VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
 
@@ -80,12 +81,10 @@ def run_inference_process(req_data: dict[str, object]) -> None:
     # new files each run
     run_parking_management(
         source=str(source_path),
-        json_path=Path(req.json_path),
-        weights=req.weights,
-        out_path=Path(req.out),
+        out_path=OUT_PATH,
         conf=req.conf,
         iou=req.iou,
-        no_verbose=req.no_verbose,
+        no_verbose=True,
         stride=req.stride,
         max_frames=req.max_frames,
         events_out_path=EVENTS_PATH,

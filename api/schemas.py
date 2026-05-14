@@ -22,18 +22,33 @@ class InferenceStatusResponse(BaseModel):
     status: InferenceState
 
 
-# TODO: Make this align with CLI arguments and validation rules
 class StartInferenceRequest(BaseModel):
     video_filename: str = Field(
         ...,
         description="Name of a video file (obtained from GET /videos)",
     )
-    out: str = "parking_management_out.mp4"
-    stride: int = 1
-    publish_every: int = 1
-    max_frames: int | None = None
-    json_path: str = "bounding_boxes.json"
-    weights: str = "yolo26n.pt"
-    conf: float = 0.1
-    iou: float = 0.7
-    no_verbose: bool = False
+    stride: int = Field(
+        default=30,
+        ge=1,
+        description="Run inference every N frames.")
+    publish_every: int = Field(
+        default=1,
+        ge=1,
+        description="Write one JSON event every N inferences.",
+    )
+    max_frames: int | None = Field(
+        default=None,
+        ge=1,
+        description="Stop after M frames (optional).",
+    )
+    conf: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Detection confidence threshold.")
+    iou: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="IoU threshold.",
+    )
