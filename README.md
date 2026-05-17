@@ -199,6 +199,40 @@ Full help: `python parking_management.py -h`.
 python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl --stride 10
 ```
 
+## Backend API
+
+The **`api/`** package is a FastAPI server that runs `parking_management` in a background process for the operator dashboard/signage frontend. Put input videos in **`data/`** (no upload endpoint yet). While inference runs, the server writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`**.
+
+Start the server from the repo root:
+
+```bash
+uvicorn api:app --reload
+```
+
+Open **http://127.0.0.1:8000/docs** for interactive API docs and to test the endpoints.
+
+| Endpoint                   | Description                                     |
+| -------------------------- | ----------------------------------------------- |
+| `GET /health`              | Health check                                    |
+| `GET /videos`              | List video filenames in `data/`                 |
+| `GET /inference/status`    | `idle`, `running`, or `stopped`                 |
+| `POST /inference/start`    | Start inference on a chosen video               |
+| `POST /inference/stop`     | Stop a running job                              |
+| `GET /frames/{image_name}` | Serve an inferred frame JPEG                    |
+| `WS /ws/events`            | Stream JSONL parking events as they are written |
+
+Example start body for `POST /inference/start`:
+
+```json
+{
+  "video_filename": "clip_cropped.mp4",
+  "stride": 10,
+  "publish_every": 1
+}
+```
+
+Optional fields: `max_frames` (default: `None`), `conf` (default: `0.1`), `iou` (default: `0.7`).
+
 ## Vehicle Detection
 
 **`vehicle_detection.py`** is a legacy utility and is no longer part of the main workflow. We now use **`parking_management.py`** for parking-slot occupancy as the primary pipeline.
