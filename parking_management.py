@@ -19,8 +19,8 @@ Typical order of scripts (see README.md):
 
 Run:
 
-  python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --events-out parking_events.jsonl --stride 10
-  python parking_management.py data/clip_cropped.mp4 --stride 5 --no-verbose
+  python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --events-out parking_events.jsonl
+  python parking_management.py data/clip_cropped.mp4 --stride 30 --no-verbose
   python parking_management.py data/clip_cropped.mp4 -j bounding_boxes.json --classes 2,3,5,7
 
 Full help:
@@ -38,8 +38,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 import cv2
-from ultralytics import solutions
 from ultralytics.solutions.solutions import SolutionResults
+
+from voting_parking_management import VotingParkingManagement
 
 DEFAULT_WEIGHTS = "yolo26n.pt"
 DEFAULT_JSON = Path(__file__).resolve().parent / "bounding_boxes.json"
@@ -96,7 +97,7 @@ def build_inference_event(
             "street_id": "le_conte_ave",
             "frame_index": 20,
             "inference_index": 3,
-            "stride": 10,
+            "stride": 60,
             "occupied_spots": 6,
             "available_spots": 4,
             "total_spots": 10,
@@ -191,9 +192,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--stride",
         type=int,
-        default=1,
+        default=60,
         metavar="N",
-        help="Run the model every N frames (default: 1), i.e. an inference is run every "
+        help="Run the model every N frames (default: 60), i.e. an inference is run every "
         "N frames. Between inferences, the last annotated frame from the previous inference "
         "is duplicated so the output video length and FPS match the input.",
     )
@@ -226,6 +227,15 @@ def parse_args() -> argparse.Namespace:
         help="Directory to write a unique inferred/annotated JPEG for every "
         "published event. Default: parking_management_frames/",
     )
+    p.add_argument(
+        "--vote-radius",
+        type=int,
+        default=2,
+        metavar="R",
+        help="At each inference anchor f, majority-vote using (2*R+1) frames "
+        "(default: R=2 -> f-4, f-2, f, f+2, f+4). Disabled if --stride is too small "
+        "for non-overlapping windows (R=2 needs stride > 8). Use 0 to disable.",
+    )
     return p.parse_args()
 
 
@@ -239,11 +249,12 @@ def run_parking_management(
     classes_csv: str = "",
     no_verbose: bool = False,
     show: bool = False,
-    stride: int = 1,
+    stride: int = 60,
     max_frames: int | None = None,
     events_out_path: Path = Path("parking_events.jsonl"),
     publish_every: int = 1,
     inferred_frames_dir: Path = Path("parking_management_frames"),
+    vote_radius: int = 2,
     on_update: Callable[[dict[str, Any]], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> int:
@@ -265,6 +276,7 @@ def run_parking_management(
         events_out_path: Path to the events output JSONL file.
         publish_every: Number of inferences between events.
         inferred_frames_dir: Path to the inferred frames directory.
+        vote_radius: At each anchor f, sample (2*R+1) frames at f+-2, f+-4 for majority vote (0 = off).
         on_update: Optional callback to receive per-inference event data.
         should_stop: Optional callback to check if the run should stop.
     """
@@ -283,6 +295,9 @@ def run_parking_management(
         return 1
     if publish_every < 1:
         print("--publish-every must be >= 1.", file=sys.stderr)
+        return 1
+    if vote_radius < 0:
+        print("--vote-radius must be >= 0.", file=sys.stderr)
         return 1
 
     # Open the input video source
@@ -348,20 +363,24 @@ def run_parking_management(
 
     print(
         f"[parking] Config: stride={stride}, conf={conf}, iou={iou}, "
-        f"weights={weights}, json={json_path}"
+        f"weights={weights}, json={json_path}, vote_radius={vote_radius}"
     )
     print(
         f"[parking] Events: out={events_out_path.resolve()} | publish_every={publish_every} "
         f"| source_id={DEFAULT_SOURCE_ID} | street_id={DEFAULT_STREET_ID}"
     )
 
-    parking = solutions.ParkingManagement(**pm_kwargs)
+    parking = VotingParkingManagement(**pm_kwargs)
 
     last_plot = None
     index = 0
     infer_count = 0
     progress_every = max(1, int(round(fps * 5)))  # print roughly every 5 seconds
     try:
+        # TODO: We can probably optimize this by advancing the frame index by the stride,
+        # instead of reading each frame sequentially; depends on whether we need the
+        # output video to match the input video length
+
         # Main loop for each frame in the input video
         while cap.isOpened():
             # Check if the run should stop based on the optional callback
@@ -375,8 +394,13 @@ def run_parking_management(
 
             # Run the ParkingManagement model on the frame every N frames according to the stride
             if index % stride == 0 or last_plot is None:
-                # Run inference on this frame and build the event data
-                results = parking(im0)
+                results = parking.process(
+                    im0,
+                    vote_radius=vote_radius,
+                    stride=stride,
+                    cap=cap,
+                    frame_index=index,
+                )
                 last_plot = results.plot_im
                 infer_count += 1
                 should_publish = infer_count % publish_every == 0
@@ -460,6 +484,7 @@ def main() -> int:
         events_out_path=args.events_out,
         publish_every=args.publish_every,
         inferred_frames_dir=args.inferred_frames_dir,
+        vote_radius=args.vote_radius,
     )
 
 

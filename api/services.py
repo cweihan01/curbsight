@@ -86,6 +86,7 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         iou=req.iou,
         no_verbose=True,
         stride=req.stride,
+        vote_radius=req.vote_radius,
         max_frames=req.max_frames,
         events_out_path=EVENTS_PATH,
         publish_every=req.publish_every,

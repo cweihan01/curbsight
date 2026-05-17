@@ -28,9 +28,19 @@ class StartInferenceRequest(BaseModel):
         description="Name of a video file (obtained from GET /videos)",
     )
     stride: int = Field(
-        default=30,
+        default=60,
         ge=1,
-        description="Run inference every N frames.")
+        description="Run inference every N frames.",
+    )
+    vote_radius: int = Field(
+        default=2,
+        ge=0,
+        description=(
+            "Majority-vote occupancy at each inference anchor f using frames f+-2, f+-4, ... "
+            "(R=2 -> 5 frames: f-4, f-2, f, f+2, f+4). Set 0 to disable. Skipped if stride is too small "
+            "for non-overlapping vote windows."
+        ),
+    )
     publish_every: int = Field(
         default=1,
         ge=1,

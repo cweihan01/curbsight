@@ -165,7 +165,8 @@ Useful script arguments:
 | `--out <output_file_path>` | Save the output to the specified file path (default `parking_management_out.mp4`) |
 | `--json <json_file_path>` | Use a custom bounding box JSON file (default `bounding_boxes.json`) |
 | `--classes <classes>` | Restrict detection to certain vehicle classes |
-| `--stride <N>` | Process every Nth frame (default `1`) |
+| `--stride <N>` | Run inference every N frames; output video still matches input length (default `60`) |
+| `--vote-radius <R>` | Majority-vote occupancy at each anchor using frames `f+-2, f+-4, ...` (default `2` -> five frames: `f-4`, `f-2`, `f`, `f+2`, `f+4`). Set `0` to disable. Skipped automatically if `--stride` is too small for non-overlapping vote windows (`R=2` needs `stride > 8`) |
 | `--no-verbose` | Disable verbose output |
 | `--events-out <path>` | Write per-inference JSON events to a `.jsonl` file (default `parking_events.jsonl`) |
 | `--publish-every <N>` | Emit one JSON event every N inferences (default `1`). If used with `--stride <X>`, the event will be published every X\*Nth frame. |
@@ -173,13 +174,18 @@ Useful script arguments:
 Example commands:
 
 ```bash
-# Basic usage: process a video and save the video output with overlaid occupancy results to parking_out.mp4
-# and stream per-inference availability events to parking_events.jsonl
-python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl
+# Default: inference every 60 frames with majority vote of 5 frames at each inference step; output video length still matches input
+python parking_management.py data/clip_cropped.mp4
 
-# Process every 10th frame (output video will remain the same duration as the input video)
-# This is recommended for faster processing (fewer inferences)
-python parking_management.py data/clip_cropped.mp4 --stride 10
+# Finer sampling (more events, slower)
+python parking_management.py data/clip_cropped.mp4 --stride 30
+
+# Disable majority vote (single-frame occupancy inference per inference step)
+python parking_management.py data/clip_cropped.mp4 --vote-radius 0
+
+# Save the video output with overlaid occupancy results to parking_out.mp4 and
+# stream per-inference availability events to parking_events.jsonl
+python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl
 
 # Use a custom bounding box JSON file
 python parking_management.py data/clip_cropped.mp4 -j bounding_boxes.json
@@ -196,7 +202,7 @@ Full help: `python parking_management.py -h`.
 ### End-to-end parking example (after preprocessing)
 
 ```bash
-python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl --stride 10
+python parking_management.py data/clip_cropped.mp4 -o parking_out.mp4 --events-out parking_events.jsonl
 ```
 
 ## Backend API
@@ -226,12 +232,13 @@ Example start body for `POST /inference/start`:
 ```json
 {
   "video_filename": "clip_cropped.mp4",
-  "stride": 10,
+  "stride": 60,
+  "vote_radius": 2,
   "publish_every": 1
 }
 ```
 
-Optional fields: `max_frames` (default: `None`), `conf` (default: `0.1`), `iou` (default: `0.7`).
+Optional fields: `max_frames` (default: `None`), `conf` (default: `0.1`), `iou` (default: `0.7`). Omitted fields use CLI defaults: `stride` **60**, `vote_radius` **2**, `publish_every` **1**.
 
 ## Vehicle Detection
 

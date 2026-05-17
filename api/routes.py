@@ -70,6 +70,8 @@ def get_frame(image_name: str) -> FileResponse:
     return FileResponse(image_path)
 
 
+# TODO: This should do more than just send events, it should process events and send only
+# what needs to be changed per sign/street
 @router.websocket("/ws/events")
 async def ws_events(websocket: WebSocket) -> None:
     await websocket.accept()
