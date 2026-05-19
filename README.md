@@ -1,6 +1,6 @@
 # Curbsight
 
-Ultralytics YOLO-based tooling for parking analysis: **preprocessing** and optional **augmentation** helpers for video, with **`parking_management.py`** as the main script for **parking-slot occupancy** using `bounding_boxes.json`. The older **`vehicle_detection.py`** utility is kept for occasional quick experiments.
+Ultralytics YOLO-based tooling for parking analysis: **preprocessing** and optional **augmentation** helpers for video, with **`parking_management.py`** as the main script for **parking-slot occupancy** using `bounding_boxes.json`, a **FastAPI** backend, and a **React** operator/signage frontend. The older **`vehicle_detection.py`** utility is kept for occasional quick experiments.
 
 ## Requirements
 
@@ -240,7 +240,61 @@ Example start body for `POST /inference/start`:
 
 Optional fields: `max_frames` (default: `None`), `conf` (default: `0.1`), `iou` (default: `0.7`). Omitted fields use CLI defaults: `stride` **60**, `vote_radius` **2**, `publish_every` **1**.
 
-## Vehicle Detection
+## Frontend
+
+The **`frontend/`** app is a React + TypeScript + Vite UI for operators and a driver-facing street sign. It talks to the [Backend API](#backend-api) over HTTP and WebSocket while inference runs.
+
+### Requirements
+
+- **Node.js 18+** and npm
+- Backend running at **http://127.0.0.1:8000** (see above)
+- At least one `.mp4` or `.mov` file in **`data/`**
+
+### Run locally
+
+From the repo root, start the API first, then the dev server:
+
+```bash
+# Terminal 1 — backend
+uvicorn api:app --reload
+
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://127.0.0.1:5173**. Vite proxies `/api` and `/frames` to port 8000; the WebSocket client connects directly to `ws://localhost:8000/ws/events`.
+
+Production build:
+
+```bash
+cd frontend
+npm run build
+npm run preview   # serves dist/ on port 4173 by default
+```
+
+### Pages
+
+| Route                 | Purpose                                                                    |
+| --------------------- | -------------------------------------------------------------------------- |
+| `/` (Dashboard)       | Start/stop inference, live annotated frame, occupancy gauge, history chart |
+| `/sign` (Street Sign) | Same controls plus a large **spaces available** display for signage        |
+
+### Project layout
+
+```
+frontend/
+  src/pages/          DashboardPage, SignPage
+  src/components/     ControlPanel, FrameViewer, OccupancyGauge, …
+  src/hooks/          useInferenceSocket, useFramePlayer
+  src/api/client.ts   REST helpers (/api → backend)
+  vite.config.ts      dev proxies for /api and /frames
+```
+
+More detail: [`frontend/README.md`](frontend/README.md).
+
+## Vehicle Detection (Legacy)
 
 **`vehicle_detection.py`** is a legacy utility and is no longer part of the main workflow. We now use **`parking_management.py`** for parking-slot occupancy as the primary pipeline.
 
