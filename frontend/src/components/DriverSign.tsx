@@ -1,0 +1,133 @@
+interface Row {
+  location: string
+  available: number | null
+  isLive: boolean
+}
+
+interface Props {
+  availableSpots: number | null
+  totalSpots: number | null
+  isLoading: boolean
+}
+
+const DUMMY_ROWS: Row[] = [
+  { location: 'Gayley & Kinross', available: 8, isLive: false },
+  { location: 'Westwood & Lindbrook', available: 22, isLive: false },
+]
+
+function spotColor(available: number | null, isLoading: boolean): string {
+  if (isLoading || available === null) return '#6b7280'
+  if (available === 0) return '#ef4444'
+  if (available <= 3) return '#f59e0b'
+  return '#4ade80'
+}
+
+function SpotCount({ available, isLoading }: { available: number | null; isLoading: boolean }) {
+  const color = spotColor(available, isLoading)
+  if (isLoading) {
+    return <span style={{ color, fontFamily: 'monospace' }} className="text-2xl font-bold tracking-widest">--</span>
+  }
+  return (
+    <span style={{ color, fontFamily: 'monospace' }} className="text-2xl font-bold tabular-nums tracking-widest">
+      {available ?? '--'}
+    </span>
+  )
+}
+
+export function DriverSign({ availableSpots, totalSpots, isLoading }: Props) {
+  const liveRow: Row = {
+    location: 'Le Conte & Westwood Blvd',
+    available: availableSpots,
+    isLive: true,
+  }
+
+  const rows = [liveRow, ...DUMMY_ROWS]
+
+  return (
+    <div
+      className="w-full rounded-xl overflow-hidden select-none"
+      style={{
+        background: '#0a1a0a',
+        border: '3px solid #1a3a1a',
+        boxShadow: '0 0 40px rgba(74, 222, 128, 0.08), inset 0 0 60px rgba(0,0,0,0.4)',
+        fontFamily: "'Courier New', Courier, monospace",
+      }}
+    >
+      {/* Header row */}
+      <div
+        className="flex items-center justify-between px-6 py-4"
+        style={{ borderBottom: '2px solid #1a3a1a', background: '#0d220d' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center rounded font-black text-sm"
+            style={{
+              width: 32,
+              height: 32,
+              background: '#4ade80',
+              color: '#0a1a0a',
+              letterSpacing: 0,
+            }}
+          >
+            P
+          </div>
+          <span
+            className="text-lg font-bold tracking-widest uppercase"
+            style={{ color: '#4ade80', letterSpacing: '0.15em' }}
+          >
+            Westwood Village Parking
+          </span>
+        </div>
+        <span
+          className="text-xs font-bold tracking-widest uppercase"
+          style={{ color: '#22543d', letterSpacing: '0.2em' }}
+        >
+          OPEN
+        </span>
+      </div>
+
+      {/* Rows */}
+      {rows.map((row, i) => (
+        <div
+          key={row.location}
+          className="flex items-center justify-between px-6 py-5"
+          style={{
+            borderBottom: i < rows.length - 1 ? '1px solid #112211' : undefined,
+            background: i % 2 === 0 ? 'transparent' : 'rgba(74,222,128,0.02)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            {row.isLive && (
+              <span
+                className="text-xs font-bold rounded px-1.5 py-0.5"
+                style={{ background: '#14532d', color: '#4ade80', letterSpacing: '0.1em' }}
+              >
+                LIVE
+              </span>
+            )}
+            <span
+              className="text-base tracking-wide"
+              style={{ color: '#86efac', letterSpacing: '0.05em' }}
+            >
+              {row.location}
+            </span>
+          </div>
+          <SpotCount
+            available={row.isLive ? availableSpots : row.available}
+            isLoading={row.isLive && isLoading}
+          />
+        </div>
+      ))}
+
+      {/* Footer */}
+      <div
+        className="px-6 py-2 text-right"
+        style={{ borderTop: '1px solid #112211' }}
+      >
+        <span className="text-xs" style={{ color: '#1a4a1a', letterSpacing: '0.1em' }}>
+          {totalSpots !== null ? `${totalSpots} TOTAL SPACES` : 'CURBSIGHT'}
+        </span>
+      </div>
+    </div>
+  )
+}
