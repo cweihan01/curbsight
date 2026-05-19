@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import cv2
 import numpy as np
 from ultralytics import solutions
@@ -46,6 +48,15 @@ def sample_frame_indices(
 
 class VotingParkingManagement(solutions.ParkingManagement):
     """Extends Ultralytics ParkingManagement with per-slot occupancy helpers."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._last_region_occupied: list[bool] | None = None
+
+    @property
+    def last_region_occupied(self) -> list[bool] | None:
+        """Per-region occupancy from the most recent process() call (voted when active)."""
+        return self._last_region_occupied
 
     def region_occupancy(self, im0: np.ndarray) -> list[bool]:
         """
@@ -168,6 +179,7 @@ class VotingParkingManagement(solutions.ParkingManagement):
             )
 
         self.pr_info["Occupancy"], self.pr_info["Available"] = occupied_slots, available_slots
+        self._last_region_occupied = list(region_occupied)
 
         annotator.display_analytics(im0, self.pr_info, (104, 31, 17), (255, 255, 255), 10)
 
@@ -206,7 +218,9 @@ class VotingParkingManagement(solutions.ParkingManagement):
         """
         # Call the standard Ultralytics ParkingManagement process method if no voting
         if vote_radius <= 0 or stride <= 2 * vote_radius * VOTE_FRAME_STEP:
-            return super().process(im0)
+            results = super().process(im0)
+            self._last_region_occupied = self.region_occupancy(im0)
+            return results
 
         # Check if the required video capture and frame index are provided
         if cap is None or frame_index is None:
