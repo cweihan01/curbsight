@@ -11,12 +11,12 @@ from api.schemas import InferenceState, ParkingRegion, StartInferenceRequest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 EVENTS_PATH = REPO_ROOT / "parking_events.jsonl"
-FRAMES_DIR = REPO_ROOT / "parking_management_frames"
+FRAMES_DIR = REPO_ROOT / "inferred_frames"
 OUT_PATH = REPO_ROOT / "parking_management_out.mp4"
 
 VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
 
-# Assume names in the data/<session_id> folder follows this naming convention
+# Assume names in the data/clipped/<session_id> folder follows this naming convention
 # where all 3 files are present
 SESSION_VIDEO_NAME = "recording.mp4"
 SESSION_REGIONS_NAME = "bounding_boxes.json"

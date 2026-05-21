@@ -248,7 +248,7 @@ python parking_management.py data/clipped/day_test/recording.mp4
 
 ## Backend API
 
-The **`api/`** package is a FastAPI server that runs `parking_management` in a **background process** for the operator dashboard. While inference runs, it writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`** at the repo root (per-session outputs are planned; see TODO in `api/services.py`).
+The **`api/`** package is a FastAPI server that runs `parking_management` in a **background process** for the operator dashboard. While inference runs, it writes **`parking_events.jsonl`** and annotated JPEGs under **`inferred_frames/`** at the repo root (per-session outputs are planned; see TODO in `api/services.py`).
 
 Start the server from the repo root:
 
