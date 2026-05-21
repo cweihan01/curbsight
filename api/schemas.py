@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class HealthResponse(BaseModel):
@@ -8,7 +8,24 @@ class HealthResponse(BaseModel):
 
 
 class VideosResponse(BaseModel):
+    """Legacy flat list of videos directly under data/."""
+
     filenames: list[str]
+
+
+class SessionsResponse(BaseModel):
+    """Complete session folders under data/."""
+
+    session_ids: list[str] = Field(
+        default_factory=list,
+        description="Folder names with recording.mp4, bounding_boxes.json, and reference_frame.jpg.",
+    )
+
+
+class ParkingRegion(BaseModel):
+    """One parking slot polygon (Ultralytics bounding_boxes.json format)."""
+
+    points: list[list[int]]
 
 
 class InferenceState(str, Enum):
@@ -23,9 +40,16 @@ class InferenceStatusResponse(BaseModel):
 
 
 class StartInferenceRequest(BaseModel):
-    video_filename: str = Field(
-        ...,
-        description="Name of a video file (obtained from GET /videos)",
+    video_filename: str | None = Field(
+        default=None,
+        description=(
+            "Legacy: video basename under data/ (from GET /videos). "
+            "Deprecated in favor of session_id when using data/<session_id>/ layouts."
+        ),
+    )
+    session_id: str | None = Field(
+        default=None,
+        description="Session folder under data/ (from GET /sessions).",
     )
     stride: int = Field(
         default=60,
@@ -55,10 +79,17 @@ class StartInferenceRequest(BaseModel):
         default=0.1,
         ge=0.0,
         le=1.0,
-        description="Detection confidence threshold.")
+        description="Detection confidence threshold.",
+    )
     iou: float = Field(
         default=0.7,
         ge=0.0,
         le=1.0,
         description="IoU threshold.",
     )
+
+    @model_validator(mode="after")
+    def require_video_filename_or_session_id(self) -> "StartInferenceRequest":
+        if not self.session_id and not self.video_filename:
+            raise ValueError("Either session_id or video_filename is required.")
+        return self
