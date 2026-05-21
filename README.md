@@ -161,11 +161,11 @@ Each run produces:
 
 | Output                                            | Default location                                                  |
 | ------------------------------------------------- | ----------------------------------------------------------------- |
-| Bounding boxes JSON (`-j`)                        | `<video-parent>/bounding_boxes.json`                       |
-| Video (`-o`)                                      | `<video-parent>/output/parking_management_out.mp4`                       |
-| Events (`--events-out`)                           | `<video-parent>/output/parking_events.jsonl`                             |
-| Inferred JPEGs (`--inferred-frames-dir`)          | `<video-parent>/output/inferred_frames/` (cwd)                                |
-| Validation metrics (`--metrics-out`, with `--gt`) | `<video-parent>/output/validation_metrics.json`                          |
+| Bounding boxes JSON (`-j`)                        | `<video-parent>/bounding_boxes.json`                              |
+| Video (`-o`)                                      | `<video-parent>/output/parking_management_out.mp4`                |
+| Events (`--events-out`)                           | `<video-parent>/output/parking_events.jsonl`                      |
+| Inferred JPEGs (`--inferred-frames-dir`)          | `<video-parent>/output/inferred_frames/` (cwd)                    |
+| Validation metrics (`--metrics-out`, with `--gt`) | `<video-parent>/output/validation_metrics.json`                   |
 
 For a **webcam index** or **URL** source, `<video-parent>` is the current working directory (outputs still go under `output/` there).
 
@@ -249,7 +249,6 @@ python parking_management.py data/clipped/day_test/recording.mp4
 ## Backend API
 
 The **`api/`** package is a FastAPI server that runs `parking_management` in a **background process** for the operator dashboard. While inference runs, it writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`** at the repo root (per-session outputs are planned; see TODO in `api/services.py`).
-The **`api/`** package is a FastAPI server that runs `parking_management` in a **background process** for the operator dashboard. While inference runs, it writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`** at the repo root (per-session outputs are planned; see TODO in `api/services.py`).
 
 Start the server from the repo root:
 
@@ -259,44 +258,6 @@ uvicorn api:app --reload
 
 Open **http://127.0.0.1:8000/docs** for interactive API docs and to test the endpoints.
 
-### Session data layout
-
-| File                  | Role                               |
-| --------------------- | ---------------------------------- |
-| `recording.mp4`       | Source video for inference         |
-| `bounding_boxes.json` | Parking slot polygons              |
-| `reference_frame.jpg` | Still for region overlay in the UI |
-
-### Endpoints
-
-| Endpoint                                     | Description                                                                      |
-| -------------------------------------------- | -------------------------------------------------------------------------------- |
-| `GET /health`                                | Health check                                                                     |
-| `GET /sessions`                              | `{ "session_ids": ["2025-05-18", ...] }` — complete session folders only         |
-| `GET /sessions/{session_id}/regions`         | `list` of `{ "points": [[x, y], ...] }` (`ParkingRegion`)                        |
-| `GET /sessions/{session_id}/reference-frame` | Reference JPEG                                                                   |
-| `GET /sessions/{session_id}/video`           | Source video (`recording.mp4`)                                                   |
-| `GET /videos`                                | **Deprecated** — flat `.mp4`/`.mov` basenames directly under `data/`             |
-| `GET /inference/status`                      | `idle`, `running`, `started`, or `stopped`                                       |
-| `POST /inference/start`                      | Start inference (`session_id` or legacy `video_filename`)                        |
-| `POST /inference/stop`                       | Stop a running job                                                               |
-| `GET /frames/{image_name}`                   | Inferred snapshot JPEG from the active run                                       |
-| `WS /ws/events`                              | Stream JSONL inference events + lifecycle `{ "type": "status", "state": "..." }` |
-
-### Start inference
-
-**Session** (uses that folder’s `recording.mp4` and `bounding_boxes.json`):
-
-```json
-{
-  "session_id": "2025-05-18",
-  "stride": 60,
-  "vote_radius": 2,
-  "publish_every": 1
-}
-```
-
-**Legacy** flat file under `data/` (uses repo-root `bounding_boxes.json`):
 ### Session data layout
 
 | File                  | Role                               |
@@ -345,11 +306,6 @@ Open **http://127.0.0.1:8000/docs** for interactive API docs and to test the end
 }
 ```
 
-Provide **either** `session_id` or `video_filename`. Optional: `max_frames`, `conf` (default `0.1`), `iou` (default `0.7`).
-
-### WebSocket event fields
-
-Each inference line (no `type` field) includes fields such as `timestamp_iso`, `source_id`, `street_id`, `frame_index`, `inference_index`, `stride`, `occupied_spots`, `available_spots`, `total_spots`, `occupancy_ratio`, `total_tracks`, and `inferred_image_path` (basename for `GET /frames/{image_name}`).
 Provide **either** `session_id` or `video_filename`. Optional: `max_frames`, `conf` (default `0.1`), `iou` (default `0.7`).
 
 ### WebSocket event fields
