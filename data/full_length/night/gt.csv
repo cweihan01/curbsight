@@ -1,0 +1,17 @@
+﻿spot_id,start_frame,end_frame,status,notes
+1,0,21060,occupied,
+2,0,21060,occupied,
+3,0,21060,occupied,
+4,0,21060,occupied,
+5,0,21060,occupied,
+6,0,21060,occupied,
+7,0,1680,occupied,
+7,1740,3360,available,car leaves at 00:58
+7,3420,6060,occupied,car enters at 01:54
+7,6120,7560,available,car leaves at 03:24
+7,7620,9840,occupied,car enters at 04:14
+7,9900,11160,available,car leaves at 05:30
+7,11220,21060,occupied,car enters at 06:14
+8,0,21060,occupied,
+9,0,21060,occupied,
+10,0,21060,occupied,

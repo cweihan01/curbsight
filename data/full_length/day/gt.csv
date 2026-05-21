@@ -1,0 +1,38 @@
+﻿spot_id,start_frame,end_frame,status,notes
+1,0,11880,available,
+1,11940,25260,occupied,car entered 06:38
+1,25320,26490,available,car left 14:04
+2,0,26490,occupied,
+3,0,26490,occupied,
+4,0,7680,occupied,
+4,7740,12840,available,car left 04:18
+4,12900,16260,occupied,car entered 07:10
+4,16320,17160,available,car left 09:04
+4,17220,20100,occupied,car entered 09:34
+4,20160,20800,available,car left 11:12
+4,20940,26490,occupied,car entered 11:38
+5,0,26490,occupied,
+6,0,7140,available,
+6,7200,9180,occupied,car entered 04:00
+6,9240,15180,available,car left 05:08
+6,15240,16980,occupied,car entered 08:28
+6,17040,18720,available,car left 09:28
+6,18780,20460,occupied,car entered 10:26
+6,20520,25320,available,car left 11:24
+6,25380,26490,occupied,car entered 14:06
+7,0,26490,occupied,
+8,0,1020,occupied,
+8,1080,10320,available,car left 00:36
+8,10380,11880,occupied,car entered 05:46
+8,11940,23700,available,car left 06:38
+8,23760,24140,occupied,car entered 13:12
+8,25200,26400,available,car left 14:00
+8,26460,26490,occupied,car entered 14:42
+9,0,10200,available,
+9,10260,10320,occupied,car entered 05:42
+9,10380,21660,available,car left 05:46
+9,21720,23700,occupied,car entered 12:04
+9,23760,24720,available,car left 13:12
+9,24780,26400,occupied,car entered 13:46
+9,26460,26490,available,car left 14:42
+10,0,26490,occupied,

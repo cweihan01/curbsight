@@ -1,0 +1,13 @@
+﻿video_id,spot_id,start_frame,end_frame,status,notes
+daytime_clip.mp4,1,0,1320,available,
+daytime_clip.mp4,2,0,1320,occupied,
+daytime_clip.mp4,3,0,1320,occupied,
+daytime_clip.mp4,4,0,1080,occupied,
+daytime_clip.mp4,4,1140,1320,available,car leaves at frame 1140
+daytime_clip.mp4,5,0,1320,occupied,
+daytime_clip.mp4,6,0,540,available,
+daytime_clip.mp4,6,600,1320,occupied,car enters at frame 600
+daytime_clip.mp4,7,0,1320,occupied,
+daytime_clip.mp4,8,0,1320,available,
+daytime_clip.mp4,9,0,1320,available,
+daytime_clip.mp4,10,0,1320,occupied,
