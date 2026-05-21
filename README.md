@@ -1,6 +1,6 @@
 # Curbsight
 
-Ultralytics YOLO-based tooling for parking analysis: **preprocessing** and optional **augmentation** helpers for video, with **`parking_management.py`** as the main script for **parking-slot occupancy** using `bounding_boxes.json`, a **FastAPI** backend, and a **React** operator/signage frontend. The older **`vehicle_detection.py`** utility is kept for occasional quick experiments.
+Ultralytics YOLO-based tooling for parking analysis: **preprocessing** and optional **augmentation** helpers for video, with **`parking_management.py`** as the main script for **parking-slot occupancy**, a **FastAPI** backend, and a **React** operator/signage frontend. The older **`vehicle_detection.py`** utility is kept for occasional quick experiments.
 
 ## Requirements
 
@@ -155,62 +155,62 @@ Each run produces:
 
 - **Annotated video** — occupancy overlays; length and FPS match the input (frames between inferences reuse the last overlay).
 - **`parking_events.jsonl`** — one JSON object per published inference (occupancy counts, frame indices, optional path to a snapshot JPEG).
-- **`parking_management_frames/`** — one inferred JPEG per published event (cleared at the start of each run when using default overwrite behavior).
+- **`inferred_frames/`** — one inferred JPEG per published event (cleared at the start of each run when using default overwrite behavior).
 
 **Default paths** (when flags are omitted):
 
-| Output | Default location |
-| ------ | ---------------- |
-| Regions JSON (`-j`) | `bounding_boxes.json` next to `parking_management.py` (repo root) |
-| Video (`-o`) | `<video-parent>/parking_management_out.mp4` |
-| Events (`--events-out`) | `<video-parent>/parking_events.jsonl` |
-| Inferred JPEGs (`--inferred-frames-dir`) | `parking_management_frames/` (cwd) |
-| Validation metrics (`--metrics-out`, with `--gt`) | `<video-parent>/validation_metrics.json` |
+| Output                                            | Default location                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------- |
+| Bounding boxes JSON (`-j`)                        | `<video-parent>/bounding_boxes.json`                       |
+| Video (`-o`)                                      | `<video-parent>/output/parking_management_out.mp4`                       |
+| Events (`--events-out`)                           | `<video-parent>/output/parking_events.jsonl`                             |
+| Inferred JPEGs (`--inferred-frames-dir`)          | `<video-parent>/output/inferred_frames/` (cwd)                                |
+| Validation metrics (`--metrics-out`, with `--gt`) | `<video-parent>/output/validation_metrics.json`                          |
 
-For a **webcam index** or **URL** source, `<video-parent>` is the current working directory.
+For a **webcam index** or **URL** source, `<video-parent>` is the current working directory (outputs still go under `output/` there).
 
 Each JSONL event includes `source_id`, `street_id`, `frame_index`, `inference_index`, `stride`, spot counts, `occupancy_ratio`, `total_tracks`, and `inferred_image_path` when a snapshot was written.
 
 Useful script arguments:
 
-| Option | Description |
-| ------------------------------ | ---------------------------------------- |
-| `--weights`, `-w` | YOLO weights (default `yolo26n.pt`) |
-| `--conf` | Detection confidence threshold (default `0.1`) |
-| `--iou` | IoU threshold for object detection (default `0.7`) |
-| `--show` | Open a preview window; if omitted, results are saved to an output video file |
-| `--out`, `-o` | Output video path (default `<source-dir>/parking_management_out.mp4`) |
-| `--json`, `-j` | Parking regions JSON (default repo-root `bounding_boxes.json`) |
-| `--classes` | Comma-separated COCO class ids (e.g. `2,3,5,7` for vehicles) |
-| `--stride <N>` | Run inference every N frames; output video still matches input length (default `60`) |
-| `--max-frames <M>` | Stop after M frames (optional; useful for quick tests) |
-| `--vote-radius <R>` | Majority-vote occupancy at each anchor using frames `f±2`, `f±4`, … (default `2` → five frames: `f-4`, `f-2`, `f`, `f+2`, `f+4`). Set `0` to disable. Skipped automatically if `--stride` is too small for non-overlapping vote windows (`R=2` needs `stride > 8`) |
-| `--no-verbose` | Disable verbose tracker/detection output |
-| `--events-out` | Per-inference JSONL for backend ingestion (default `<source-dir>/parking_events.jsonl`) |
-| `--publish-every <N>` | Write one JSON event every N inferences (default `1`). With `--stride X`, events land every `X×N` frames. |
-| `--inferred-frames-dir` | Directory for per-event JPEG snapshots (default `parking_management_frames/`) |
+| Option                  | Description                                                                                                                                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--weights`, `-w`       | YOLO weights (default `yolo26n.pt`)                                                                                                                                                                                                                                |
+| `--conf`                | Detection confidence threshold (default `0.1`)                                                                                                                                                                                                                     |
+| `--iou`                 | IoU threshold for object detection (default `0.7`)                                                                                                                                                                                                                 |
+| `--show`                | Open a preview window; if omitted, results are saved to an output video file                                                                                                                                                                                       |
+| `--out`, `-o`           | Output video path (default `<source-dir>/output/parking_management_out.mp4`)                                                                                                                                                                                              |
+| `--json`, `-j`          | Parking regions JSON (default repo-root `bounding_boxes.json`)                                                                                                                                                                                                     |
+| `--classes`             | Comma-separated COCO class ids (e.g. `2,3,5,7` for vehicles)                                                                                                                                                                                                       |
+| `--stride <N>`          | Run inference every N frames; output video still matches input length (default `60`)                                                                                                                                                                               |
+| `--max-frames <M>`      | Stop after M frames (optional; useful for quick tests)                                                                                                                                                                                                             |
+| `--vote-radius <R>`     | Majority-vote occupancy at each anchor using frames `f±2`, `f±4`, … (default `2` → five frames: `f-4`, `f-2`, `f`, `f+2`, `f+4`). Set `0` to disable. Skipped automatically if `--stride` is too small for non-overlapping vote windows (`R=2` needs `stride > 8`) |
+| `--no-verbose`          | Disable verbose tracker/detection output                                                                                                                                                                                                                           |
+| `--events-out`          | Per-inference JSONL for backend ingestion (default `<source-dir>/output/parking_events.jsonl`)                                                                                                                                                                            |
+| `--publish-every <N>`   | Write one JSON event every N inferences (default `1`). With `--stride X`, events land every `X×N` frames.                                                                                                                                                          |
+| `--inferred-frames-dir` | Directory for per-event JPEG snapshots (default `inferred_frames/`)                                                                                                                                                                                      |
 
 **Validation** (optional; implemented in `parking_metrics.py`):
 
-| Option | Description |
-| ------------------------------ | ---------------------------------------- |
-| `--gt <csv>` | Ground-truth CSV: `spot_id`, `start_frame`, `end_frame`, `status` (`occupied` / `available` / `unknown`; aliases like `free` accepted). Spot index *i* in `bounding_boxes.json` maps to `spot_id` = `str(i + 1)`. |
-| `--metrics-out` | Write accuracy / per-spot metrics JSON (default `<source-dir>/validation_metrics.json`) |
-| `--disagreements-out` | Optional CSV of `(frame_index, spot_id, gt, pred)` mismatches |
-| `--validation-events-out` | Optional JSONL of per-inference per-spot snapshots (separate from `--events-out`) |
-| `--no-video` | Skip annotated video (faster metrics-only runs with `--gt`) |
+| Option                    | Description                                                                                                                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--gt <csv>`              | Ground-truth CSV: `spot_id`, `start_frame`, `end_frame`, `status` (`occupied` / `available` / `unknown`; aliases like `free` accepted). Spot index _i_ in `bounding_boxes.json` maps to `spot_id` = `str(i + 1)`. |
+| `--metrics-out`           | Write accuracy / per-spot metrics JSON (default `<source-dir>/output/validation_metrics.json`)                                                                                                                           |
+| `--disagreements-out`     | Optional CSV of `(frame_index, spot_id, gt, pred)` mismatches                                                                                                                                                     |
+| `--validation-events-out` | Optional JSONL of per-inference per-spot snapshots (separate from `--events-out`)                                                                                                                                 |
+| `--no-video`              | Skip annotated video (faster metrics-only runs with `--gt`)                                                                                                                                                       |
 
 Example commands:
 
 ```bash
-# Default: inference every 60 frames with 5-frame majority vote; outputs under data/
-python parking_management.py data/clip_cropped.mp4
+# DEFAULT: inference every 60 frames with 5-frame majority vote; outputs under <video-parent>/output, no metrics
+python parking_management.py data/clipped/day_test/recording.mp4
 
 # Finer sampling (more events, slower)
-python parking_management.py data/clip_cropped.mp4 --stride 30
+python parking_management.py data/clipped/day_test/recording.mp4 --stride 30
 
 # Disable majority vote (single-frame occupancy per inference step)
-python parking_management.py data/clip_cropped.mp4 --vote-radius 0
+python parking_management.py data/clipped/day_test/recording.mp4 --vote-radius 0
 
 # Explicit output paths and event stream
 python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --events-out data/parking_events.jsonl
@@ -224,10 +224,11 @@ python parking_management.py data/clip_cropped.mp4 --max-frames 300
 # Run on webcam (index 0) with live preview instead of saving video
 python parking_management.py 0 --show
 
-# Validate against ground truth (frame-accurate; disable vote smoothing)
-python parking_management.py data/daytime/clip/daytime_clip.mp4 --gt data/daytime/clip/clip_gt.csv \
-  -j data/daytime/clip/bounding_boxes.json -o data/daytime/clip/validation_out.mp4 \
-  --metrics-out data/daytime/clip/validation_metrics.json --stride 1 --vote-radius 0
+# Validate against ground truth CSV (default stride, vote smoothing)
+python parking_management.py data/clipped/day_test/recording.mp4 --gt
+
+# Validate against ground truth CSV (frame-accurate; disable vote smoothing)
+python parking_management.py data/clipped/day_test/recording.mp4 --gt --stride 1 --vote-radius 0
 ```
 
 Full help: `python parking_management.py -h`.
@@ -235,12 +236,12 @@ Full help: `python parking_management.py -h`.
 ### End-to-end parking example (after preprocessing)
 
 ```bash
-python parking_management.py data/clip_cropped.mp4 -o data/parking_out.mp4 --events-out data/parking_events.jsonl
+python parking_management.py data/clipped/day_test/recording.mp4
 ```
 
 ## Backend API
 
-The **`api/`** package is a FastAPI server that runs `parking_management` in a background process for the operator dashboard/signage frontend. Put input videos in **`data/`** (no upload endpoint yet). While inference runs, the server writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`**.
+The **`api/`** package is a FastAPI server that runs `parking_management` in a **background process** for the operator dashboard. While inference runs, it writes **`parking_events.jsonl`** and annotated JPEGs under **`parking_management_frames/`** at the repo root (per-session outputs are planned; see TODO in `api/services.py`).
 
 Start the server from the repo root:
 
@@ -250,17 +251,44 @@ uvicorn api:app --reload
 
 Open **http://127.0.0.1:8000/docs** for interactive API docs and to test the endpoints.
 
-| Endpoint                   | Description                                     |
-| -------------------------- | ----------------------------------------------- |
-| `GET /health`              | Health check                                    |
-| `GET /videos`              | List video filenames in `data/`                 |
-| `GET /inference/status`    | `idle`, `running`, or `stopped`                 |
-| `POST /inference/start`    | Start inference on a chosen video               |
-| `POST /inference/stop`     | Stop a running job                              |
-| `GET /frames/{image_name}` | Serve an inferred frame JPEG                    |
-| `WS /ws/events`            | Stream JSONL parking events as they are written |
+### Session data layout
 
-Example start body for `POST /inference/start`:
+| File                  | Role                               |
+| --------------------- | ---------------------------------- |
+| `recording.mp4`       | Source video for inference         |
+| `bounding_boxes.json` | Parking slot polygons              |
+| `reference_frame.jpg` | Still for region overlay in the UI |
+
+### Endpoints
+
+| Endpoint                                     | Description                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `GET /health`                                | Health check                                                                     |
+| `GET /sessions`                              | `{ "session_ids": ["2025-05-18", ...] }` — complete session folders only         |
+| `GET /sessions/{session_id}/regions`         | `list` of `{ "points": [[x, y], ...] }` (`ParkingRegion`)                        |
+| `GET /sessions/{session_id}/reference-frame` | Reference JPEG                                                                   |
+| `GET /sessions/{session_id}/video`           | Source video (`recording.mp4`)                                                   |
+| `GET /videos`                                | **Deprecated** — flat `.mp4`/`.mov` basenames directly under `data/`             |
+| `GET /inference/status`                      | `idle`, `running`, `started`, or `stopped`                                       |
+| `POST /inference/start`                      | Start inference (`session_id` or legacy `video_filename`)                        |
+| `POST /inference/stop`                       | Stop a running job                                                               |
+| `GET /frames/{image_name}`                   | Inferred snapshot JPEG from the active run                                       |
+| `WS /ws/events`                              | Stream JSONL inference events + lifecycle `{ "type": "status", "state": "..." }` |
+
+### Start inference
+
+**Session** (uses that folder’s `recording.mp4` and `bounding_boxes.json`):
+
+```json
+{
+  "session_id": "2025-05-18",
+  "stride": 60,
+  "vote_radius": 2,
+  "publish_every": 1
+}
+```
+
+**Legacy** flat file under `data/` (uses repo-root `bounding_boxes.json`):
 
 ```json
 {
@@ -271,7 +299,11 @@ Example start body for `POST /inference/start`:
 }
 ```
 
-Optional fields: `max_frames` (default: `None`), `conf` (default: `0.1`), `iou` (default: `0.7`). Omitted fields use CLI defaults: `stride` **60**, `vote_radius` **2**, `publish_every` **1**.
+Provide **either** `session_id` or `video_filename`. Optional: `max_frames`, `conf` (default `0.1`), `iou` (default `0.7`).
+
+### WebSocket event fields
+
+Each inference line (no `type` field) includes fields such as `timestamp_iso`, `source_id`, `street_id`, `frame_index`, `inference_index`, `stride`, `occupied_spots`, `available_spots`, `total_spots`, `occupancy_ratio`, `total_tracks`, and `inferred_image_path` (basename for `GET /frames/{image_name}`).
 
 ## Frontend
 
