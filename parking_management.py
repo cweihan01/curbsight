@@ -58,9 +58,15 @@ from voting_parking_management import VotingParkingManagement
 
 DEFAULT_WEIGHTS = "yolo26n.pt"
 
+# TODO: These should be removed since we have multiple locations now;
+# use the JSON and source from the chosen session folder instead
+DEFAULT_JSON = Path(__file__).resolve().parent / "bounding_boxes.json"
 DEFAULT_SOURCE_ID = "ralphs_garage"
 DEFAULT_STREET_ID = "le_conte_ave"
+
 # Global run behavior for overwriting files inside the target output dir
+# - True: fresh run (clear frames dir + overwrite events file)
+# - False: incremental run (keep frames dir contents + append events file)
 OVERWRITE_ON_EACH_RUN = True
 
 DEFAULT_OUT_VIDEO = "parking_management_out.mp4"
@@ -113,7 +119,38 @@ def build_inference_event(
     results: SolutionResults,
     inferred_image_path: str | None = None,
 ) -> dict[str, Any]:
-    """Build a JSON event for the parking management system."""
+    """
+    Build a JSON event for the parking management system.
+
+    Args:
+        frame_index: The index of the frame in the video (0-indexed).
+        inference_index: The index of the inference (1-indexed). This does not equal the frame_index if stride > 1.
+        stride: Number of frames between inferences.
+        source_id: The id of the source.
+        street_id: The id of the street.
+        results: The results of the inference (SolutionResults object from ParkingManagement.process()).
+
+    Returns:
+        A dictionary containing the event data.
+        Example:
+        ```json
+        {
+            "timestamp_iso": "2026-05-07T05:59:05.888053+00:00",
+            "source_id": "ralphs_garage",
+            "street_id": "le_conte_ave",
+            "frame_index": 20,
+            "inference_index": 3,
+            "stride": 60,
+            "occupied_spots": 6,
+            "available_spots": 4,
+            "total_spots": 10,
+            "occupancy_ratio": 0.6,
+            "total_tracks": 6
+            "inferred_image_path": "parking_management_frames/inferred_003_frame_000020.jpg"
+        }
+        ```
+    """
+    # These are fields from Ultralytics ParkingManagement's SolutionResults object
     occupied_spots = results.filled_slots
     available_spots = results.available_slots
     total_tracks = results.total_tracks
@@ -148,12 +185,13 @@ def parse_args() -> argparse.Namespace:
         "source",
         help="Input video path, or webcam index (e.g. 0).",
     )
+    # TODO: Should make the user specify the JSON path instead of using the default
     p.add_argument(
         "--json",
         "-j",
         type=Path,
-        default=None,
-        help="Parking regions JSON (defaults to bounding_boxes.json in video directory).",
+        default=DEFAULT_JSON,
+        help=f"Parking regions JSON (default: {DEFAULT_JSON} in repo root).",
     )
     p.add_argument(
         "--weights",
@@ -205,7 +243,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=60,
         metavar="N",
-        help="Run the model every N frames (default: 60).",
+        help="Run the model every N frames (default: 60), i.e. an inference is run every "
+        "N frames. Between inferences, the last annotated frame from the previous inference "
+        "is duplicated so the output video length and FPS match the input.",
     )
     p.add_argument(
         "--max-frames",
@@ -225,7 +265,8 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         metavar="N",
-        help="Write one event every N inferences (default: 1).",
+        help="Write one event every N inferences (default: 1). If used with --stride <X>, "
+        "the event will be written every X*Nth frame.",
     )
     p.add_argument(
         "--inferred-frames-dir",
@@ -238,7 +279,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=2,
         metavar="R",
-        help="At each inference anchor f, majority-vote using (2*R+1) frames. Use 0 to disable.",
+        help="At each inference anchor f, majority-vote using (2*R+1) frames "
+        "(default: R=2 -> f-4, f-2, f, f+2, f+4). Disabled if --stride is too small "
+        "for non-overlapping windows (R=2 needs stride > 8). Use 0 to disable.",
     )
     val = p.add_argument_group("validation (optional)")
     val.add_argument(
@@ -363,11 +406,13 @@ def run_parking_management(
         gt_path = gt_resolved
         print(f"[validation] GT: {gt_path} | metrics_out={metrics_out}")
 
+    # Open the input video source
     cap = open_capture(source)
     if not cap.isOpened():
         print(f"Error opening video source: {source!r}", file=sys.stderr)
         return 1
 
+    # Get the input video properties
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = float(cap.get(cv2.CAP_PROP_FPS))
@@ -391,6 +436,7 @@ def run_parking_management(
             cap.release()
             return 1
 
+    # Open the events output file (overwrite or append based on global run behavior)
     events_file_mode = "w" if OVERWRITE_ON_EACH_RUN else "a"
     try:
         events_file = events_out_path.open(events_file_mode, encoding="utf-8")
@@ -414,6 +460,7 @@ def run_parking_management(
             events_file.close()
             return 1
 
+    # Create the inferred frames directory; clear it if we are overwriting on each run
     inferred_frames_dir.mkdir(parents=True, exist_ok=True)
     if OVERWRITE_ON_EACH_RUN:
         for jpg_path in inferred_frames_dir.glob("*.jpg"):
@@ -422,6 +469,7 @@ def run_parking_management(
             except OSError as e:
                 print(f"Warning: could not delete {jpg_path} ({e})", file=sys.stderr)
 
+    # Build the ParkingManagement configs
     classes = parse_classes(classes_csv)
     pm_kwargs: dict = {
         "model": weights,
@@ -446,10 +494,17 @@ def run_parking_management(
     infer_count = 0
     progress_every = max(1, int(round(fps * 5)))
     try:
+        # TODO: We can probably optimize this by advancing the frame index by the stride,
+        # instead of reading each frame sequentially; depends on whether we need the
+        # output video to match the input video length
+
+        # Main loop for each frame in the input video
         while cap.isOpened():
+            # Check if the run should stop based on the optional callback
             if should_stop is not None and should_stop():
                 break
 
+            # Read the next frame from the input video
             ret, im0 = cap.read()
             if not ret:
                 break
@@ -511,12 +566,15 @@ def run_parking_management(
                         inferred_image_path),
                 )
 
+                # Write the event data to the output JSONL file every N inferences
+                # according to publish_every
                 if should_publish:
                     if inferred_image_path is not None:
                         cv2.imwrite(str(inferred_image_path), results.plot_im)
                     events_file.write(json.dumps(event) + "\n")
                     events_file.flush()
 
+                # Optional callback to receive the event data
                 if on_update is not None:
                     on_update(event)
 
@@ -537,6 +595,7 @@ def run_parking_management(
                         f"| inferences={infer_count}"
                     )
 
+            # Stop after the maximum number of frames if specified
             if max_frames is not None and index >= max_frames:
                 break
     finally:
