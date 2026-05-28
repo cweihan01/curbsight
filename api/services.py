@@ -48,12 +48,6 @@ class SessionPaths:
         return self.session_dir / SESSION_REFERENCE_FRAME_NAME
 
 
-@dataclass(frozen=True)
-class InferencePaths:
-    source: Path
-    json_path: Path
-
-
 def process_running(proc: mp.Process | None) -> bool:
     return proc is not None and proc.is_alive()
 
@@ -92,7 +86,9 @@ def resolve_session(session_id: str) -> SessionPaths:
 
     Requires recording.mp4, bounding_boxes.json, and reference_frame.jpg.
     """
-    session_id = session_id.strip()
+    # Accept nested ids like "clipped/day" corresponding to the relative folder
+    # path in the data directory
+    session_id = session_id.strip().replace("\\", "/")
     if not session_id:
         raise ValueError("session_id is required.")
 
@@ -119,11 +115,19 @@ def list_sessions() -> list[str]:
     """
     if not DATA_DIR.is_dir():
         return []
+
     session_ids: list[str] = []
-    for path in sorted(DATA_DIR.iterdir()):
-        if path.is_dir() and session_dir_has_required_files(path):
-            session_ids.append(path.name)
-    return session_ids
+
+    # A valid session is any directory (possibly nested) that contains recording.mp4.
+    for video_path in sorted(DATA_DIR.rglob(SESSION_VIDEO_NAME)):
+        session_dir = video_path.parent
+        if not session_dir_has_required_files(session_dir):
+            continue
+        session_id = session_dir.relative_to(DATA_DIR).as_posix()
+        session_ids.append(session_id)
+
+    # rglob can discover duplicates in unusual filesystem setups; keep output stable.
+    return sorted(set(session_ids))
 
 
 def load_session_regions(session_id: str) -> list[ParkingRegion]:
@@ -181,39 +185,42 @@ def resolve_data_video(filename: str) -> Path:
     return filepath
 
 
-def resolve_inference_paths(req: StartInferenceRequest) -> InferencePaths:
-    """Resolve video source and regions JSON for an inference job."""
-    # Session layout
+def run_inference_process(req_data: dict[str, object]) -> None:
+    """Run inference in a child process."""
+    # Convert args to Pydantic model
+    req = StartInferenceRequest(**req_data)
+
+    # Resolve source/regions and output paths based on session vs legacy request
     if req.session_id:
         session = resolve_session(req.session_id)
-        return InferencePaths(source=session.video_path, json_path=session.regions_path)
+        source = session.video_path
+        json_path = session.regions_path
+        output_dir = session.session_dir / "output"
+        out_path = output_dir / "parking_management_out.mp4"
+        events_out_path = output_dir / "parking_events.jsonl"
+        inferred_frames_dir = output_dir / "inferred_frames"
+    else:
+        assert req.video_filename is not None
+        source = resolve_data_video(req.video_filename)
+        json_path = DEFAULT_JSON
+        out_path = OUT_PATH
+        events_out_path = EVENTS_PATH
+        inferred_frames_dir = FRAMES_DIR
 
-    # Legacy flat layout
-    assert req.video_filename is not None
-    return InferencePaths(
-        source=resolve_data_video(req.video_filename),
-        json_path=DEFAULT_JSON,
-    )
-
-
-def run_inference_process(req_data: dict[str, object]) -> None:
-    req = StartInferenceRequest(**req_data)
-    paths = resolve_inference_paths(req)
-
-    # TODO: per-session events_out_path, inferred_frames_dir, out_path under session_dir
+    # Run inference
     run_parking_management(
-        source=str(paths.source),
-        json_path=paths.json_path,
-        out_path=OUT_PATH,
+        source=str(source),
+        json_path=json_path,
+        out_path=out_path,
         conf=req.conf,
         iou=req.iou,
         no_verbose=True,
         stride=req.stride,
         vote_radius=req.vote_radius,
         max_frames=req.max_frames,
-        events_out_path=EVENTS_PATH,
+        events_out_path=events_out_path,
         publish_every=req.publish_every,
-        inferred_frames_dir=FRAMES_DIR,
+        inferred_frames_dir=inferred_frames_dir,
     )
 
 

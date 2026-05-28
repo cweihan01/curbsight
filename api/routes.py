@@ -41,7 +41,7 @@ def list_sessions() -> SessionsResponse:
 
 
 @router.get(
-    "/sessions/{session_id}/regions",
+    "/sessions/{session_id:path}/regions",
     status_code=status.HTTP_200_OK,
     response_model=list[ParkingRegion],
 )
@@ -58,7 +58,7 @@ def get_session_regions(session_id: str) -> list[ParkingRegion]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail) from e
 
 
-@router.get("/sessions/{session_id}/reference-frame", status_code=status.HTTP_200_OK)
+@router.get("/sessions/{session_id:path}/reference-frame", status_code=status.HTTP_200_OK)
 def get_session_reference_frame(session_id: str) -> FileResponse:
     """Still image aligned with bounding_boxes.json."""
     try:
@@ -68,7 +68,7 @@ def get_session_reference_frame(session_id: str) -> FileResponse:
     return FileResponse(session.reference_frame_path)
 
 
-@router.get("/sessions/{session_id}/video", status_code=status.HTTP_200_OK)
+@router.get("/sessions/{session_id:path}/video", status_code=status.HTTP_200_OK)
 def get_session_video(session_id: str) -> FileResponse:
     """Session source video (recording.mp4)."""
     try:
@@ -92,7 +92,11 @@ async def start_inference(req: StartInferenceRequest) -> InferenceStatusResponse
         )
 
     try:
-        svc.resolve_inference_paths(req)
+        if req.session_id:
+            svc.resolve_session(req.session_id)
+        else:
+            assert req.video_filename is not None
+            svc.resolve_data_video(req.video_filename)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
