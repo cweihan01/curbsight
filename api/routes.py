@@ -78,6 +78,26 @@ def get_session_video(session_id: str) -> FileResponse:
     return FileResponse(session.video_path)
 
 
+@router.get("/sessions/{session_id:path}/frames/{image_name}", status_code=status.HTTP_200_OK)
+def get_session_frame(session_id: str, image_name: str) -> FileResponse:
+    """Inferred frame JPEG for a specific session run."""
+    try:
+        image_path = svc.resolve_session_frame_path(session_id, image_name)
+    except ValueError as e:
+        detail = str(e)
+        if detail == "Invalid frame path.":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from e
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail) from e
+
+    if not image_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Frame not found.",
+        )
+    return FileResponse(image_path)
+
+
 @router.get("/inference/status", status_code=status.HTTP_200_OK)
 def inference_status() -> InferenceStatusResponse:
     return InferenceStatusResponse(status=svc.get_inference_state())
@@ -111,8 +131,9 @@ async def stop_inference() -> InferenceStatusResponse:
     return InferenceStatusResponse(status=svc.get_inference_state())
 
 
-@router.get("/frames/{image_name}", status_code=status.HTTP_200_OK)
+@router.get("/frames/{image_name}", status_code=status.HTTP_200_OK, deprecated=True)
 def get_frame(image_name: str) -> FileResponse:
+    """Deprecated global frame endpoint. Use /sessions/{session_id}/frames/{image_name}."""
     image_path = (svc.FRAMES_DIR / image_name).resolve()
     frames_root = svc.FRAMES_DIR.resolve()
     if frames_root not in image_path.parents:

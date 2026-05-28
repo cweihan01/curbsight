@@ -142,6 +142,16 @@ def load_session_regions(session_id: str) -> list[ParkingRegion]:
     return [ParkingRegion.model_validate(region) for region in raw]
 
 
+def resolve_session_frame_path(session_id: str, image_name: str) -> Path:
+    """Resolve one inferred frame path under data/<session_id>/output/inferred_frames/."""
+    session = resolve_session(session_id)
+    frames_root = (session.session_dir / "output" / "inferred_frames").resolve()
+    image_path = (frames_root / image_name).resolve()
+    if frames_root not in image_path.parents:
+        raise ValueError("Invalid frame path.")
+    return image_path
+
+
 def list_data_videos() -> list[str]:
     """
     Basenames of video files directly under data/ (legacy flat layout).
