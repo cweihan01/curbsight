@@ -205,6 +205,7 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         session = resolve_session(req.session_id)
         source = session.video_path
         json_path = session.regions_path
+        session_id = req.session_id.strip().replace("\\", "/")
         output_dir = session.session_dir / "output"
         out_path = output_dir / "parking_management_out.mp4"
         events_out_path = output_dir / "parking_events.jsonl"
@@ -216,17 +217,20 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         out_path = OUT_PATH
         events_out_path = EVENTS_PATH
         inferred_frames_dir = FRAMES_DIR
+        session_id = None
 
     # Run inference
     run_parking_management(
         source=str(source),
         json_path=json_path,
         out_path=out_path,
+        overwrite=True,
         conf=req.conf,
         iou=req.iou,
         no_verbose=True,
         stride=req.stride,
         vote_radius=req.vote_radius,
+        session_id=session_id,
         max_frames=req.max_frames,
         events_out_path=events_out_path,
         publish_every=req.publish_every,

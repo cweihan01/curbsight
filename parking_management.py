@@ -61,9 +61,6 @@ DEFAULT_WEIGHTS = "yolo26n.pt"
 # TODO: These should be removed since we have multiple locations now;
 # use the JSON and source from the chosen session folder instead
 DEFAULT_JSON = Path(__file__).resolve().parent / "bounding_boxes.json"
-DEFAULT_SOURCE_ID = "ralphs_garage"
-DEFAULT_STREET_ID = "le_conte_ave"
-
 # Global run behavior for overwriting files inside the target output dir
 # - True: fresh run (clear frames dir + overwrite events file)
 # - False: incremental run (keep frames dir contents + append events file)
@@ -114,10 +111,10 @@ def build_inference_event(
     frame_index: int,
     inference_index: int,
     stride: int,
-    source_id: str,
-    street_id: str,
+    session_id: str | None,
     results: SolutionResults,
     inferred_image_path: str | None = None,
+    inferred_image_filename: str | None = None,
 ) -> dict[str, Any]:
     """
     Build a JSON event for the parking management system.
@@ -126,9 +123,10 @@ def build_inference_event(
         frame_index: The index of the frame in the video (0-indexed).
         inference_index: The index of the inference (1-indexed). This does not equal the frame_index if stride > 1.
         stride: Number of frames between inferences.
-        source_id: The id of the source.
-        street_id: The id of the street.
+        session_id: The id of the session containing the video.
         results: The results of the inference (SolutionResults object from ParkingManagement.process()).
+        inferred_image_path: The path to the inferred image.
+        inferred_image_filename: The filename of the inferred image.
 
     Returns:
         A dictionary containing the event data.
@@ -136,8 +134,7 @@ def build_inference_event(
         ```json
         {
             "timestamp_iso": "2026-05-07T05:59:05.888053+00:00",
-            "source_id": "ralphs_garage",
-            "street_id": "le_conte_ave",
+            "session_id": "ralphs_day",
             "frame_index": 20,
             "inference_index": 3,
             "stride": 60,
@@ -147,6 +144,7 @@ def build_inference_event(
             "occupancy_ratio": 0.6,
             "total_tracks": 6
             "inferred_image_path": "parking_management_frames/inferred_003_frame_000020.jpg"
+            "inferred_image_filename": "inferred_003_frame_000020.jpg"
         }
         ```
     """
@@ -162,8 +160,7 @@ def build_inference_event(
 
     return {
         "timestamp_iso": datetime.now(timezone.utc).isoformat(),
-        "source_id": source_id,
-        "street_id": street_id,
+        "session_id": session_id,
         "frame_index": frame_index,
         "inference_index": inference_index,
         "stride": stride,
@@ -173,6 +170,7 @@ def build_inference_event(
         "occupancy_ratio": occupancy_ratio,
         "total_tracks": total_tracks,
         "inferred_image_path": inferred_image_path,
+        "inferred_image_filename": inferred_image_filename,
     }
 
 
@@ -335,6 +333,7 @@ def run_parking_management(
     publish_every: int = 1,
     inferred_frames_dir: Path | None = None,
     vote_radius: int = 2,
+    session_id: str | None = None,
     gt_path: Path | None = None,
     metrics_out: Path | None = None,
     disagreements_out: Path | None = None,
@@ -363,6 +362,9 @@ def run_parking_management(
     
     if gt_path == Path("AUTO"):
         gt_path = source_parent / "gt.csv"
+
+    if session_id is None:
+        session_id = source_parent.name if source_path else None
 
     # Resolve bounding boxes JSON
     json_path = json_path.resolve()
@@ -559,11 +561,14 @@ def run_parking_management(
                     frame_index=index,
                     inference_index=infer_count,
                     stride=stride,
-                    source_id=DEFAULT_SOURCE_ID,
-                    street_id=DEFAULT_STREET_ID,
+                    session_id=session_id,
                     results=results,
-                    inferred_image_path=None if inferred_image_path is None else str(
-                        inferred_image_path),
+                    inferred_image_path=(
+                        None if inferred_image_path is None else str(inferred_image_path)
+                    ),
+                    inferred_image_filename=(
+                        None if inferred_image_path is None else inferred_image_path.name
+                    ),
                 )
 
                 # Write the event data to the output JSONL file every N inferences
