@@ -7,9 +7,9 @@ import { FrameViewer } from '../components/FrameViewer'
 
 export function DashboardPage() {
   const { events, status, notifyStart } = useInferenceSocket()
-  const { currentFrame, currentEvent, displayedEvents } = useFramePlayer(events)
+  const frame = useFramePlayer(events)
 
-  const isLoading = status === 'started' || (status === 'running' && currentEvent === null)
+  const isLoading = status === 'started' || (status === 'running' && frame.currentEvent === null)
 
   return (
     <div className="grid grid-cols-[280px_1fr] gap-6 flex-1">
@@ -18,10 +18,23 @@ export function DashboardPage() {
       </aside>
       <main className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-4">
-          <FrameViewer currentFrame={currentFrame} currentEvent={currentEvent} isLoading={isLoading} />
-          <OccupancyGauge latest={currentEvent} isLoading={isLoading} />
+          <FrameViewer
+            currentFrame={frame.currentFrame}
+            currentEvent={frame.currentEvent}
+            isLoading={isLoading}
+            currentIndex={frame.currentIndex}
+            frameCount={frame.frameCount}
+            isLive={frame.isLive}
+            canGoPrev={frame.canGoPrev}
+            canGoNext={frame.canGoNext}
+            onPrev={frame.goPrev}
+            onNext={frame.goNext}
+            onGoToIndex={frame.goToIndex}
+            onLatest={frame.goLatest}
+          />
+          <OccupancyGauge latest={frame.currentEvent} isLoading={isLoading} />
         </div>
-        <OccupancyChart events={displayedEvents} isLoading={isLoading} />
+        <OccupancyChart events={frame.displayedEvents} isLoading={isLoading} />
       </main>
     </div>
   )

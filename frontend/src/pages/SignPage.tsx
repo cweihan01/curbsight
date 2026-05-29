@@ -6,9 +6,9 @@ import { DriverSign } from '../components/DriverSign'
 
 export function SignPage() {
   const { events, status, notifyStart } = useInferenceSocket()
-  const { currentFrame, currentEvent } = useFramePlayer(events)
+  const frame = useFramePlayer(events)
 
-  const isLoading = status === 'started' || (status === 'running' && currentEvent === null)
+  const isLoading = status === 'started' || (status === 'running' && frame.currentEvent === null)
 
   return (
     <div className="grid grid-cols-[280px_1fr_1fr] gap-6 flex-1 items-start">
@@ -16,11 +16,24 @@ export function SignPage() {
         <ControlPanel status={status} notifyStart={notifyStart} />
       </aside>
 
-      <FrameViewer currentFrame={currentFrame} currentEvent={currentEvent} isLoading={isLoading} />
+      <FrameViewer
+        currentFrame={frame.currentFrame}
+        currentEvent={frame.currentEvent}
+        isLoading={isLoading}
+        currentIndex={frame.currentIndex}
+        frameCount={frame.frameCount}
+        isLive={frame.isLive}
+        canGoPrev={frame.canGoPrev}
+        canGoNext={frame.canGoNext}
+        onPrev={frame.goPrev}
+        onNext={frame.goNext}
+        onGoToIndex={frame.goToIndex}
+        onLatest={frame.goLatest}
+      />
 
       <DriverSign
-        availableSpots={currentEvent?.available_spots ?? null}
-        totalSpots={currentEvent?.total_spots ?? null}
+        availableSpots={frame.currentEvent?.available_spots ?? null}
+        totalSpots={frame.currentEvent?.total_spots ?? null}
         isLoading={isLoading}
       />
     </div>
