@@ -22,4 +22,4 @@ runs/
 
 # Parking Management output
 *.jsonl
-parking_management_frames/
+inferred_frames/
