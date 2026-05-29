@@ -19,9 +19,6 @@ export default defineConfig({
         target: 'ws://localhost:8000',
         ws: true,
       },
-      '/frames': {
-        target: 'http://localhost:8000',
-      },
     },
   },
 })

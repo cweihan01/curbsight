@@ -51,6 +51,8 @@ class StartInferenceRequest(BaseModel):
         default=None,
         description="Session folder under data/ (from GET /sessions).",
     )
+    # TODO: Add support for users to specify the bounding box json file
+    # (specify the exact json points)
     stride: int = Field(
         default=60,
         ge=1,

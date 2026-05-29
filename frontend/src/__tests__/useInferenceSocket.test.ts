@@ -26,14 +26,17 @@ describe('Bug 1: events are ignored before notifyStart()', () => {
     expect(result.current.latest).toBeNull()
   })
 
-  it('processes events after notifyStart is called', async () => {
+  it('processes events after notifyStart and reconnect', async () => {
     const { result } = renderHook(() => useInferenceSocket())
-    const ws = getMockWs()
 
     await act(async () => {
-      ws.simulateOpen()
-      result.current.notifyStart()
-      ws.simulateMessage(makeEvent())
+      getMockWs().simulateOpen()
+      result.current.notifyStart('test/session')
+    })
+
+    await act(async () => {
+      getMockWs().simulateOpen()
+      getMockWs().simulateMessage(makeEvent())
     })
 
     expect(result.current.events).toHaveLength(1)
@@ -48,7 +51,7 @@ describe('Bug 2: Stop button enabled after start', () => {
 
     await act(async () => {
       ws.simulateOpen()
-      result.current.notifyStart()
+      result.current.notifyStart('test/session')
     })
 
     expect(result.current.status).toBe('started')
@@ -56,12 +59,14 @@ describe('Bug 2: Stop button enabled after start', () => {
 
   it('status becomes running after first inference event', async () => {
     const { result } = renderHook(() => useInferenceSocket())
-    const ws = getMockWs()
 
     await act(async () => {
-      ws.simulateOpen()
-      result.current.notifyStart()
-      ws.simulateMessage(makeEvent())
+      getMockWs().simulateOpen()
+      result.current.notifyStart('test/session')
+    })
+    await act(async () => {
+      getMockWs().simulateOpen()
+      getMockWs().simulateMessage(makeEvent())
     })
 
     expect(result.current.status).toBe('running')
@@ -69,14 +74,16 @@ describe('Bug 2: Stop button enabled after start', () => {
 
   it('status returns to idle and stops processing events after idle status message', async () => {
     const { result } = renderHook(() => useInferenceSocket())
-    const ws = getMockWs()
 
     await act(async () => {
+      getMockWs().simulateOpen()
+      result.current.notifyStart('test/session')
+    })
+    await act(async () => {
+      const ws = getMockWs()
       ws.simulateOpen()
-      result.current.notifyStart()
       ws.simulateMessage(makeEvent())
       ws.simulateMessage({ type: 'status', state: 'idle' })
-      // further events should now be ignored
       ws.simulateMessage(makeEvent({ frame_index: 99 }))
     })
 

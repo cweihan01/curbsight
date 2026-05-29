@@ -1,6 +1,6 @@
 export interface InferenceEvent {
   timestamp_iso: string
-  source_id: string
+  session_id: string
   frame_index: number
   inference_index: number
   stride: number
@@ -9,7 +9,7 @@ export interface InferenceEvent {
   total_spots: number
   occupancy_ratio: number
   total_tracks: number
-  inferred_image_path: string | null
+  inferred_image_filename: string | null
 }
 
 export interface StatusMessage {
@@ -17,12 +17,17 @@ export interface StatusMessage {
   state: InferenceState
 }
 
-export type SocketMessage = InferenceEvent | StatusMessage
+export interface WarningMessage {
+  type: 'warning'
+  message: string
+}
+
+export type SocketMessage = InferenceEvent | StatusMessage | WarningMessage
 
 export type InferenceState = 'running' | 'idle' | 'started' | 'stopped'
 
 export interface StartInferenceRequest {
-  video_filename: string
+  session_id: string
   stride: number
   publish_every: number
   max_frames?: number

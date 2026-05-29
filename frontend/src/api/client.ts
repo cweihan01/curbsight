@@ -9,9 +9,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export async function getVideos(): Promise<string[]> {
-  const data = await request<{ filenames: string[] }>('/videos')
-  return data.filenames
+export async function getSessions(): Promise<string[]> {
+  const data = await request<{ session_ids: string[] }>('/sessions')
+  return data.session_ids
+}
+
+/** URL for GET /sessions/{session_id}/frames/{image_name} (via Vite /api proxy). */
+export function sessionFrameUrl(sessionId: string, imageName: string): string {
+  const sessionPath = sessionId.split('/').map(encodeURIComponent).join('/')
+  return `/api/sessions/${sessionPath}/frames/${encodeURIComponent(imageName)}`
 }
 
 export async function startInference(req: StartInferenceRequest): Promise<void> {

@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
-import { getVideos, startInference, stopInference } from '../api/client'
+import { getSessions, startInference, stopInference } from '../api/client'
 import type { InferenceState } from '../types'
 
-interface Props {
+interface ControlPanelProps {
   status: InferenceState
-  onStart: () => void
-  notifyStart: () => void
+  notifyStart: (sessionId: string) => void
 }
 
-export function ControlPanel({ status, onStart, notifyStart }: Props) {
-  const [videos, setVideos] = useState<string[]>([])
+export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
+  const [sessions, setSessions] = useState<string[]>([])
   const [selected, setSelected] = useState('')
-  const [stride, setStride] = useState(30)
+  const [stride, setStride] = useState(60)
   const [conf, setConf] = useState(0.1)
   const [iou, setIou] = useState(0.7)
   const [error, setError] = useState<string | null>(null)
@@ -20,21 +19,20 @@ export function ControlPanel({ status, onStart, notifyStart }: Props) {
   const isStarting = status === 'started'
 
   useEffect(() => {
-    getVideos()
-      .then((v) => {
-        setVideos(v)
-        if (v.length > 0) setSelected(v[0])
+    getSessions()
+      .then((ids) => {
+        setSessions(ids)
+        if (ids.length > 0) setSelected(ids[0])
       })
-      .catch(() => setError('Could not load videos — is the backend running?'))
+      .catch(() => setError('Could not load sessions — is the backend running?'))
   }, [])
 
   async function handleStart() {
     if (!selected) return
     setError(null)
     try {
-      await startInference({ video_filename: selected, stride, publish_every: 1, conf, iou })
-      notifyStart()
-      onStart()
+      await startInference({ session_id: selected, stride, publish_every: 1, conf, iou })
+      notifyStart(selected)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start inference')
     }
@@ -54,16 +52,16 @@ export function ControlPanel({ status, onStart, notifyStart }: Props) {
       <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider">Controls</h2>
 
       <div className="flex flex-col gap-2">
-        <label className="text-slate-400 text-xs">Video</label>
+        <label className="text-slate-400 text-xs">Session</label>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           disabled={isRunning}
           className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
         >
-          {videos.length === 0 && <option value="">No videos found</option>}
-          {videos.map((v) => (
-            <option key={v} value={v}>{v}</option>
+          {sessions.length === 0 && <option value="">No sessions found</option>}
+          {sessions.map((id) => (
+            <option key={id} value={id}>{id}</option>
           ))}
         </select>
       </div>

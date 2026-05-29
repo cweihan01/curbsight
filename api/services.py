@@ -13,6 +13,8 @@ DATA_DIR = REPO_ROOT / "data"
 EVENTS_PATH = REPO_ROOT / "parking_events.jsonl"
 FRAMES_DIR = REPO_ROOT / "inferred_frames"
 OUT_PATH = REPO_ROOT / "parking_management_out.mp4"
+SESSION_OUTPUT_DIR = "output"
+SESSION_EVENTS_NAME = "parking_events.jsonl"
 
 VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
 
@@ -26,6 +28,8 @@ SESSION_REFERENCE_FRAME_NAME = "reference_frame.jpg"
 inference_process: mp.Process | None = None
 # True after a running job is terminated by user; set to False on next inference start
 stopped_by_user: bool = False
+# JSONL file tailed by /ws/events for the current or most recent inference run
+active_events_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,23 @@ def resolve_session(session_id: str) -> SessionPaths:
         raise ValueError(f"Session not found: {session_id}")
 
     return session
+
+
+def session_events_path(session: SessionPaths) -> Path:
+    """Parking event stream for a session run: data/<session_id>/output/parking_events.jsonl."""
+    return session.session_dir / SESSION_OUTPUT_DIR / SESSION_EVENTS_NAME
+
+
+def resolve_events_path(session_id: str | None = None) -> Path:
+    """Resolve the JSONL path for WebSocket tailing (session output or legacy repo root)."""
+    if session_id:
+        return session_events_path(resolve_session(session_id))
+    return EVENTS_PATH
+
+
+def get_events_path() -> Path:
+    """JSONL file to tail; prefers the active inference output, else legacy repo root."""
+    return active_events_path if active_events_path is not None else EVENTS_PATH
 
 
 def list_sessions() -> list[str]:
@@ -201,14 +222,16 @@ def run_inference_process(req_data: dict[str, object]) -> None:
     req = StartInferenceRequest(**req_data)
 
     # Resolve source/regions and output paths based on session vs legacy request
+    # TODO: Pass in the actual json bounding boxes from the client request
+    # Might need to pass in the json points instead of a file path
     if req.session_id:
         session = resolve_session(req.session_id)
         source = session.video_path
         json_path = session.regions_path
         session_id = req.session_id.strip().replace("\\", "/")
-        output_dir = session.session_dir / "output"
+        output_dir = session.session_dir / SESSION_OUTPUT_DIR
         out_path = output_dir / "parking_management_out.mp4"
-        events_out_path = output_dir / "parking_events.jsonl"
+        events_out_path = session_events_path(session)
         inferred_frames_dir = output_dir / "inferred_frames"
     else:
         assert req.video_filename is not None
@@ -240,9 +263,19 @@ def run_inference_process(req_data: dict[str, object]) -> None:
 
 def spawn_inference(req: StartInferenceRequest) -> None:
     """Start inference in a daemon child process."""
-    global inference_process, stopped_by_user
+    global inference_process, stopped_by_user, active_events_path
 
     stopped_by_user = False
+    if req.session_id:
+        active_events_path = resolve_events_path(req.session_id)
+    else:
+        active_events_path = EVENTS_PATH
+
+    # Clear the event stream before the child process starts so WebSocket clients
+    # never replay the previous run while inference is still warming up
+    active_events_path.parent.mkdir(parents=True, exist_ok=True)
+    active_events_path.write_text("", encoding="utf-8")
+
     inference_process = mp.Process(
         target=run_inference_process,
         args=(req.model_dump(),),

@@ -152,13 +152,24 @@ def get_frame(image_name: str) -> FileResponse:
 # TODO: This should do more than just send events, it should process events and send only
 # what needs to be changed per sign/street
 @router.websocket("/ws/events")
-async def ws_events(websocket: WebSocket) -> None:
+async def ws_events(websocket: WebSocket, session_id: str | None = None) -> None:
     await websocket.accept()
-    svc.EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    svc.EVENTS_PATH.touch(exist_ok=True)
+
+    if session_id:
+        try:
+            session = svc.resolve_session(session_id)
+            events_path = svc.session_events_path(session)
+        except ValueError:
+            await websocket.close(code=4404, reason="Session not found")
+            return
+    else:
+        events_path = svc.get_events_path()
+
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.touch(exist_ok=True)
 
     try:
-        with svc.EVENTS_PATH.open("r", encoding="utf-8") as f:
+        with events_path.open("r", encoding="utf-8") as f:
             while True:
                 line = f.readline()
                 if line:

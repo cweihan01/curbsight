@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InferenceEvent, InferenceState, SocketMessage } from '../types'
 
 const MAX_EVENTS = 500
-const WS_URL = 'ws://localhost:8000/ws/events'
+
+function eventsWebSocketUrl(sessionId: string | null): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const base = `${protocol}//${window.location.host}/ws/events`
+  if (!sessionId) return base
+  return `${base}?session_id=${encodeURIComponent(sessionId)}`
+}
 
 export function useInferenceSocket() {
   const [events, setEvents] = useState<InferenceEvent[]>([])
@@ -11,6 +17,9 @@ export function useInferenceSocket() {
   const [connected, setConnected] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  const runEpochRef = useRef(0)
+  const wsEpochRef = useRef(0)
   const retryDelay = useRef(1000)
   const retryTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const unmounted = useRef(false)
@@ -21,28 +30,29 @@ export function useInferenceSocket() {
     setLatest(null)
   }, [])
 
-  const notifyStart = useCallback(() => {
-    isActive.current = true
+  const notifyStart = useCallback((sessionId: string) => {
+    runEpochRef.current += 1
+    sessionIdRef.current = sessionId
+    isActive.current = false
     setStatus('started')
     clearEvents()
-    // The inference subprocess clears the JSONL file on start. Reconnect after
-    // a short delay so the backend reopens the file from position 0, otherwise
-    // the existing file handle stays past the truncated content and misses new events.
-    setTimeout(() => {
-      retryDelay.current = 100
-      wsRef.current?.close()
-    }, 1500)
+    retryDelay.current = 100
+    wsRef.current?.close()
   }, [clearEvents])
 
   const connect = useCallback(() => {
     if (unmounted.current) return
 
-    const ws = new WebSocket(WS_URL)
+    const ws = new WebSocket(eventsWebSocketUrl(sessionIdRef.current))
     wsRef.current = ws
 
     ws.onopen = () => {
       setConnected(true)
       retryDelay.current = 1000
+      wsEpochRef.current = runEpochRef.current
+      if (sessionIdRef.current) {
+        isActive.current = true
+      }
     }
 
     ws.onmessage = (e) => {
@@ -63,10 +73,10 @@ export function useInferenceSocket() {
         return
       }
 
-      if (!isActive.current) return
+      if (!isActive.current || wsEpochRef.current !== runEpochRef.current) return
 
       const event = msg as InferenceEvent
-      if (status !== 'running') setStatus('running')
+      setStatus((prev) => (prev !== 'running' ? 'running' : prev))
       setLatest(event)
       setEvents((prev) => {
         const next = [...prev, event]
