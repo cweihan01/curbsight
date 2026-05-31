@@ -27,6 +27,12 @@ class ParkingRegion(BaseModel):
 
     points: list[list[int]]
 
+    @model_validator(mode="after")
+    def exactly_four_points(self) -> "ParkingRegion":
+        if len(self.points) != 4:
+            raise ValueError("Each bounding box must have exactly 4 points.")
+        return self
+
 
 class InferenceState(str, Enum):
     running = "running"  # inference process is running
@@ -51,8 +57,14 @@ class StartInferenceRequest(BaseModel):
         default=None,
         description="Session folder under data/ (from GET /sessions).",
     )
-    # TODO: Add support for users to specify the bounding box json file
-    # (specify the exact json points)
+    regions: list[ParkingRegion] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Selected parking slot polygons inline (bounding_boxes.json format). "
+            "Each region has exactly 4 points. Overrides session/file regions when set."
+        ),
+    )
     stride: int = Field(
         default=60,
         ge=1,

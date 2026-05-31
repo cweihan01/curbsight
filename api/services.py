@@ -216,14 +216,25 @@ def resolve_data_video(filename: str) -> Path:
     return filepath
 
 
+def write_regions_json(regions: list[ParkingRegion], dest: Path) -> Path:
+    """
+    Write the selected parking regions for ParkingManagement into a JSON file at `dest`.
+    If `dest` already exists, it will be overwritten.
+
+    Returns the path to the written file.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    payload = [region.model_dump() for region in regions]
+    dest.write_text(json.dumps(payload), encoding="utf-8")
+    return dest
+
+
 def run_inference_process(req_data: dict[str, object]) -> None:
     """Run inference in a child process."""
     # Convert args to Pydantic model
     req = StartInferenceRequest(**req_data)
 
     # Resolve source/regions and output paths based on session vs legacy request
-    # TODO: Pass in the actual json bounding boxes from the client request
-    # Might need to pass in the json points instead of a file path
     if req.session_id:
         session = resolve_session(req.session_id)
         source = session.video_path
@@ -237,10 +248,20 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         assert req.video_filename is not None
         source = resolve_data_video(req.video_filename)
         json_path = DEFAULT_JSON
+        output_dir = REPO_ROOT
         out_path = OUT_PATH
         events_out_path = EVENTS_PATH
         inferred_frames_dir = FRAMES_DIR
         session_id = None
+
+    # Write override bounding box regions to a JSON file if provided and set as active
+    # Note: This is a hacky way to pass in custom bounding boxes to ParkingManagement
+    # without having to modify the ParkingManagement class directly, since
+    # ParkingManagement expects a JSON file path and does not natively support passing in
+    # bounding box regions as a raw JSON object outside of a file.
+    if req.regions is not None:
+        json_path = write_regions_json(
+            req.regions, output_dir / "bounding_boxes_override.json")
 
     # Run inference
     run_parking_management(
