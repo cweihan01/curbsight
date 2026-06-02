@@ -11,7 +11,9 @@ interface ControlPanelProps {
 export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
   const [sessions, setSessions] = useState<string[]>([])
   const [selected, setSelected] = useState('')
-  const [stride, setStride] = useState(60)
+  const [stride, setStride] = useState(120)
+  const [voteRadius, setVoteRadius] = useState(3)
+  const [voteFrameStep, setVoteFrameStep] = useState(15)
   const [conf, setConf] = useState(0.1)
   const [iou, setIou] = useState(0.7)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +70,8 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
       await startInference({
         session_id: selected,
         stride,
+        vote_radius: voteRadius,
+        vote_frame_step: voteFrameStep,
         publish_every: 1,
         conf,
         iou,
@@ -128,6 +132,28 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             min={1}
             value={stride}
             onChange={(e) => setStride(Number(e.target.value))}
+            disabled={isRunning}
+            className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Vote radius</label>
+          <input
+            type="number"
+            min={0}
+            value={voteRadius}
+            onChange={(e) => setVoteRadius(Number(e.target.value))}
+            disabled={isRunning}
+            className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Vote step</label>
+          <input
+            type="number"
+            min={1}
+            value={voteFrameStep}
+            onChange={(e) => setVoteFrameStep(Number(e.target.value))}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />

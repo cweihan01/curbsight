@@ -274,6 +274,7 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         no_verbose=True,
         stride=req.stride,
         vote_radius=req.vote_radius,
+        vote_frame_step=req.vote_frame_step,
         session_id=session_id,
         max_frames=req.max_frames,
         events_out_path=events_out_path,

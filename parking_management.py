@@ -239,9 +239,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--stride",
         type=int,
-        default=60,
+        default=120,
         metavar="N",
-        help="Run the model every N frames (default: 60), i.e. an inference is run every "
+        help="Run the model every N frames (default: 120), i.e. an inference is run every "
         "N frames. Between inferences, the last annotated frame from the previous inference "
         "is duplicated so the output video length and FPS match the input.",
     )
@@ -275,11 +275,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--vote-radius",
         type=int,
-        default=2,
+        default=3,
         metavar="R",
         help="At each inference anchor f, majority-vote using (2*R+1) frames "
-        "(default: R=2 -> f-4, f-2, f, f+2, f+4). Disabled if --stride is too small "
-        "for non-overlapping windows (R=2 needs stride > 8). Use 0 to disable.",
+        "spaced --vote-frame-step apart (default: R=3). Disabled if --stride is too "
+        "small for non-overlapping windows (needs stride > 2*R*step). Use 0 to disable.",
+    )
+    p.add_argument(
+        "--vote-frame-step",
+        type=int,
+        default=15,
+        metavar="S",
+        help="Spacing in frames between samples in a vote window (default: 15). "
+        "With R=3, anchor f samples f-45, f-30, f-15, f, f+15, f+30, f+45.",
     )
     val = p.add_argument_group("validation (optional)")
     val.add_argument(
@@ -327,12 +335,13 @@ def run_parking_management(
     classes_csv: str = "",
     no_verbose: bool = False,
     show: bool = False,
-    stride: int = 60,
+    stride: int = 120,
     max_frames: int | None = None,
     events_out_path: Path | None = None,
     publish_every: int = 1,
     inferred_frames_dir: Path | None = None,
-    vote_radius: int = 2,
+    vote_radius: int = 3,
+    vote_frame_step: int = 15,
     session_id: str | None = None,
     gt_path: Path | None = None,
     metrics_out: Path | None = None,
@@ -384,6 +393,9 @@ def run_parking_management(
         return 1
     if vote_radius < 0:
         print("--vote-radius must be >= 0.", file=sys.stderr)
+        return 1
+    if vote_frame_step < 1:
+        print("--vote-frame-step must be >= 1.", file=sys.stderr)
         return 1
 
     validating = gt_path is not None
@@ -486,7 +498,8 @@ def run_parking_management(
 
     print(
         f"[parking] Config: stride={stride}, conf={conf}, iou={iou}, "
-        f"weights={weights}, json={json_path}, vote_radius={vote_radius}"
+        f"weights={weights}, json={json_path}, vote_radius={vote_radius}, "
+        f"vote_frame_step={vote_frame_step}"
     )
 
     parking = VotingParkingManagement(**pm_kwargs)
@@ -519,6 +532,7 @@ def run_parking_management(
                     stride=stride,
                     cap=cap,
                     frame_index=index,
+                    vote_frame_step=vote_frame_step,
                 )
                 last_plot = results.plot_im
                 infer_count += 1
@@ -667,6 +681,7 @@ def main() -> int:
         publish_every=args.publish_every,
         inferred_frames_dir=args.inferred_frames_dir,
         vote_radius=args.vote_radius,
+        vote_frame_step=args.vote_frame_step,
         gt_path=args.gt,
         metrics_out=args.metrics_out,
         disagreements_out=args.disagreements_out,

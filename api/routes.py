@@ -95,7 +95,9 @@ def get_session_frame(session_id: str, image_name: str) -> FileResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Frame not found.",
         )
-    return FileResponse(image_path)
+    # Inferred frame filenames are reused across runs (overwrite-in-place), so disable
+    # caching to prevent the browser from serving a stale frame from a previous run.
+    return FileResponse(image_path, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/inference/status", status_code=status.HTTP_200_OK)
@@ -146,7 +148,7 @@ def get_frame(image_name: str) -> FileResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Frame not found.",
         )
-    return FileResponse(image_path)
+    return FileResponse(image_path, headers={"Cache-Control": "no-store"})
 
 
 # TODO: This should do more than just send events, it should process events and send only

@@ -34,6 +34,8 @@ export interface ParkingRegion {
 export interface StartInferenceRequest {
   session_id: string
   stride: number
+  vote_radius: number
+  vote_frame_step: number
   publish_every: number
   max_frames?: number
   conf: number

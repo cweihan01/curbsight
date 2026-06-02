@@ -4,7 +4,10 @@ import type { InferenceEvent } from '../types'
 
 function frameUrlForEvent(event: InferenceEvent | null): string | null {
   if (!event?.inferred_image_filename) return null
-  return sessionFrameUrl(event.session_id, event.inferred_image_filename)
+  const base = sessionFrameUrl(event.session_id, event.inferred_image_filename)
+  // Inferred frame filenames are reused across runs; bust the browser cache with the
+  // per-inference timestamp so we never display a frame from a previous run.
+  return `${base}?v=${encodeURIComponent(event.timestamp_iso)}`
 }
 
 export function useFramePlayer(events: InferenceEvent[]) {

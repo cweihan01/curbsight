@@ -66,17 +66,25 @@ class StartInferenceRequest(BaseModel):
         ),
     )
     stride: int = Field(
-        default=60,
+        default=120,
         ge=1,
         description="Run inference every N frames.",
     )
     vote_radius: int = Field(
-        default=2,
+        default=3,
         ge=0,
         description=(
-            "Majority-vote occupancy at each inference anchor f using frames f+-2, f+-4, ... "
-            "(R=2 -> 5 frames: f-4, f-2, f, f+2, f+4). Set 0 to disable. Skipped if stride is too small "
-            "for non-overlapping vote windows."
+            "Majority-vote occupancy at each inference anchor f using 2*R+1 frames spaced "
+            "vote_frame_step apart. Set 0 to disable. Skipped if stride is too small "
+            "for non-overlapping vote windows (needs stride > 2*R*vote_frame_step)."
+        ),
+    )
+    vote_frame_step: int = Field(
+        default=15,
+        ge=1,
+        description=(
+            "Spacing in frames between samples in a vote window. "
+            "With R=3, step=12: anchor f samples f-36, f-24, f-12, f, f+12, f+24, f+36."
         ),
     )
     publish_every: int = Field(

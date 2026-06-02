@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import cv2
@@ -9,26 +10,24 @@ import numpy as np
 from ultralytics import solutions
 from ultralytics.solutions.solutions import SolutionAnnotator, SolutionResults
 
-# Spacing between frames in a vote window (f-4, f-2, f, f+2, f+4 when vote_radius=2).
-VOTE_FRAME_STEP = 2
-
 
 def sample_frame_indices(
     anchor: int,
     vote_radius: int,
+    vote_frame_step: int,
     frame_count: int,
 ) -> list[int]:
     """
-    Return (2*vote_radius + 1) frame indices around anchor in steps of VOTE_FRAME_STEP,
+    Return (2*vote_radius + 1) frame indices around anchor in steps of vote_frame_step,
     clamped/shifted at edges.
 
-    With vote_radius=2 and VOTE_FRAME_STEP=2, anchor f yields [f-4, f-2, f, f+2, f+4].
+    With vote_radius=2 and vote_frame_step=12, anchor f yields [f-24, f-12, f, f+12, f+24].
     """
     if vote_radius <= 0:
         return [anchor]
 
     indices = [
-        anchor + k * VOTE_FRAME_STEP for k in range(-vote_radius, vote_radius + 1)
+        anchor + k * vote_frame_step for k in range(-vote_radius, vote_radius + 1)
     ]
 
     if frame_count <= 0:
@@ -115,6 +114,7 @@ class VotingParkingManagement(solutions.ParkingManagement):
         cap: cv2.VideoCapture,
         anchor_index: int,
         vote_radius: int,
+        vote_frame_step: int,
         frame_count: int,
     ) -> list[bool]:
         """
@@ -123,7 +123,12 @@ class VotingParkingManagement(solutions.ParkingManagement):
         parking region/bounding box.
         """
         # Get the frame indices to sample around the anchor frame
-        indices = sample_frame_indices(anchor_index, vote_radius, frame_count)
+        indices = sample_frame_indices(
+            anchor_index,
+            vote_radius=vote_radius,
+            vote_frame_step=vote_frame_step,
+            frame_count=frame_count,
+        )
 
         # Read the frames and compute the occupancy for each bounding box
         # This stores a list of lists of booleans, where each inner list is the occupancy for a bounding box
@@ -138,6 +143,12 @@ class VotingParkingManagement(solutions.ParkingManagement):
 
         # Majority vote the occupancy for each bounding box
         majority = self.majority_region_occupancy(samples)
+        # print(
+        #     f"[voting] anchor={anchor_index}: sampled frames={indices} "
+        #     f"(read {len(samples)}/{len(indices)}), voted occupied="
+        #     f"{sum(majority)}/{len(majority)} -> {[int(o) for o in majority]}",
+        #     file=sys.stderr,
+        # )
         return majority
 
     def process_from_occupancy(
@@ -199,6 +210,7 @@ class VotingParkingManagement(solutions.ParkingManagement):
         im0: np.ndarray,
         *,
         vote_radius: int = 0,
+        vote_frame_step: int = 1,
         stride: int = 1,
         cap: cv2.VideoCapture | None = None,
         frame_index: int | None = None,
@@ -209,6 +221,7 @@ class VotingParkingManagement(solutions.ParkingManagement):
         Args:
             im0: The input frame.
             vote_radius: The radius of the vote window.
+            vote_frame_step: Spacing in frames between samples in the vote window.
             stride: The stride of the vote window.
             cap: The video capture object.
             frame_index: The index of the frame to process.
@@ -217,7 +230,19 @@ class VotingParkingManagement(solutions.ParkingManagement):
         ParkingManagement `process()` method.
         """
         # Call the standard Ultralytics ParkingManagement process method if no voting
-        if vote_radius <= 0 or stride <= 2 * vote_radius * VOTE_FRAME_STEP:
+        window = 2 * vote_radius * vote_frame_step
+        if vote_radius <= 0 or stride <= window:
+            # reason = (
+            #     "vote_radius<=0"
+            #     if vote_radius <= 0
+            #     else f"stride({stride}) <= 2*vote_radius*vote_frame_step({window})"
+            # )
+            # print(
+            #     f"[voting] frame={frame_index}: voting OFF ({reason}) -> base process() "
+            #     f"with class labels [vote_radius={vote_radius}, vote_frame_step={vote_frame_step}, "
+            #     f"stride={stride}]",
+            #     file=sys.stderr,
+            # )
             results = super().process(im0)
             self._last_region_occupied = self.region_occupancy(im0)
             return results
@@ -230,8 +255,17 @@ class VotingParkingManagement(solutions.ParkingManagement):
 
         # Majority vote occupancy on the frames around the anchor frame
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # print(
+        #     f"[voting] frame={frame_index}: voting ON [vote_radius={vote_radius}, "
+        #     f"vote_frame_step={vote_frame_step}, stride={stride}, window={window}]",
+        #     file=sys.stderr,
+        # )
         voted = self.majority_vote_occupancy(
-            cap, frame_index, vote_radius, frame_count
+            cap,
+            frame_index,
+            vote_radius=vote_radius,
+            vote_frame_step=vote_frame_step,
+            frame_count=frame_count,
         )
 
         # Reset the video capture to the next frame
