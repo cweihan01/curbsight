@@ -9,6 +9,22 @@ interface ControlPanelProps {
   notifyStart: (sessionId: string) => void
 }
 
+function TooltipLabel({ label, tip }: { label: string; tip: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-slate-400 text-xs">{label}</span>
+      <span className="relative group inline-flex">
+        <span className="w-4 h-4 rounded-full border border-slate-500 text-slate-300 text-[10px] leading-none inline-flex items-center justify-center">
+          ?
+        </span>
+        <span className="pointer-events-none absolute left-0 top-[125%] z-20 hidden group-hover:block w-56 max-w-[75vw] rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5 text-[11px] leading-4 text-slate-200 shadow-xl">
+          {tip}
+        </span>
+      </span>
+    </div>
+  )
+}
+
 export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
   const [sessions, setSessions] = useState<string[]>([])
   const [selected, setSelected] = useState('')
@@ -98,7 +114,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
       <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider">Controls</h2>
 
       <div className="flex flex-col gap-2">
-        <label className="text-slate-400 text-xs">Session</label>
+        <TooltipLabel
+          label="Session"
+          tip="Select which recording and base region file to run. Changing session switches the reference frame and available parking boxes."
+        />
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
@@ -113,7 +132,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-slate-400 text-xs">Parking boxes</label>
+        <TooltipLabel
+          label="Parking boxes"
+          tip="Open the selector to keep/remove predefined boxes. Kept boxes are sent to backend as regions for this run."
+        />
         <button
           onClick={() => setShowSelector(true)}
           disabled={isRunning || regions.length === 0}
@@ -125,9 +147,12 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-slate-400 text-xs">Stride</label>
+          <TooltipLabel
+            label="Stride"
+            tip="Run inference every N frames. Increase for less frequent updates; decrease for more frequent updates. At 30 FPS, setting stride to 120 runs inference every 4 seconds."
+          />
           <input
             type="number"
             min={1}
@@ -138,7 +163,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-slate-400 text-xs">Vote radius</label>
+          <TooltipLabel
+            label="Vote radius"
+            tip="Number of samples on each side of the anchor frame. Higher radius smooths transient occlusions but adds more per-inference work. A vote radius of 3 corresponds to a majority vote over 7 frames per inference."
+          />
           <input
             type="number"
             min={0}
@@ -149,7 +177,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-slate-400 text-xs">Vote step</label>
+          <TooltipLabel
+            label="Vote step"
+            tip="Frame gap between voting samples per inference. Increase to spread samples farther in time, making the vote more robust to brief occlusions (also requires a higher stride); decrease for tighter temporal voting. A vote step of 15 means each inference samples the frame f, f+15, f-15, f+30, f-30, etc depending on the vote radius."
+          />
           <input
             type="number"
             min={1}
@@ -160,7 +191,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-slate-400 text-xs">Conf</label>
+          <TooltipLabel
+            label="Conf"
+            tip="Detection confidence threshold. Increase to reduce false positives (but can miss cars); decrease to catch more detections (but may add noise)."
+          />
           <input
             type="number"
             min={0}
@@ -173,7 +207,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-slate-400 text-xs">IoU</label>
+          <TooltipLabel
+            label="IoU"
+            tip="Overlap threshold for keeping boxes. Higher IoU keeps more overlapping detections; lower IoU suppresses duplicates more aggressively."
+          />
           <input
             type="number"
             min={0}
