@@ -26,6 +26,11 @@ export type SocketMessage = InferenceEvent | StatusMessage | WarningMessage
 
 export type InferenceState = 'running' | 'idle' | 'started' | 'stopped'
 
+/** One parking slot polygon (bounding_boxes.json format: 4 [x, y] points). */
+export interface ParkingRegion {
+  points: number[][]
+}
+
 export interface StartInferenceRequest {
   session_id: string
   stride: number
@@ -33,4 +38,5 @@ export interface StartInferenceRequest {
   max_frames?: number
   conf: number
   iou: number
+  regions?: ParkingRegion[]
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getSessions, startInference, stopInference } from '../api/client'
-import type { InferenceState } from '../types'
+import { getSessionRegions, getSessions, startInference, stopInference } from '../api/client'
+import type { InferenceState, ParkingRegion } from '../types'
+import { RegionSelector } from './RegionSelector'
 
 interface ControlPanelProps {
   status: InferenceState
@@ -15,6 +16,10 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
   const [iou, setIou] = useState(0.7)
   const [error, setError] = useState<string | null>(null)
 
+  const [regions, setRegions] = useState<ParkingRegion[]>([])
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([])
+  const [showSelector, setShowSelector] = useState(false)
+
   const isRunning = status === 'running' || status === 'started'
   const isStarting = status === 'started'
 
@@ -27,11 +32,47 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
       .catch(() => setError('Could not load sessions — is the backend running?'))
   }, [])
 
+  useEffect(() => {
+    if (!selected) {
+      setRegions([])
+      setSelectedIndices([])
+      return
+    }
+    let cancelled = false
+    getSessionRegions(selected)
+      .then((regs) => {
+        if (cancelled) return
+        setRegions(regs)
+        setSelectedIndices(regs.map((_, i) => i))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRegions([])
+        setSelectedIndices([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
+
   async function handleStart() {
     if (!selected) return
+    if (regions.length > 0 && selectedIndices.length === 0) {
+      setError('Select at least one parking box before starting.')
+      return
+    }
     setError(null)
+    const keptRegions =
+      regions.length > 0 ? selectedIndices.map((i) => regions[i]) : undefined
     try {
-      await startInference({ session_id: selected, stride, publish_every: 1, conf, iou })
+      await startInference({
+        session_id: selected,
+        stride,
+        publish_every: 1,
+        conf,
+        iou,
+        ...(keptRegions ? { regions: keptRegions } : {}),
+      })
       notifyStart(selected)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start inference')
@@ -64,6 +105,19 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             <option key={id} value={id}>{id}</option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-slate-400 text-xs">Parking boxes</label>
+        <button
+          onClick={() => setShowSelector(true)}
+          disabled={isRunning || regions.length === 0}
+          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:hover:bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 transition-colors text-left"
+        >
+          {regions.length === 0
+            ? 'No boxes for session'
+            : `Select boxes (${selectedIndices.length}/${regions.length} kept)`}
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -131,6 +185,19 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           Stop
         </button>
       </div>
+
+      {showSelector && selected && (
+        <RegionSelector
+          sessionId={selected}
+          regions={regions}
+          initialSelected={selectedIndices}
+          onApply={(next) => {
+            setSelectedIndices(next)
+            setShowSelector(false)
+          }}
+          onClose={() => setShowSelector(false)}
+        />
+      )}
     </div>
   )
 }
