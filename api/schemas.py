@@ -2,6 +2,15 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
 
+from constants import (
+    DEFAULT_CONF,
+    DEFAULT_IOU,
+    DEFAULT_PUBLISH_EVERY,
+    DEFAULT_STRIDE,
+    DEFAULT_VOTE_FRAME_STEP,
+    DEFAULT_VOTE_RADIUS,
+)
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -66,12 +75,12 @@ class StartInferenceRequest(BaseModel):
         ),
     )
     stride: int = Field(
-        default=120,
+        default=DEFAULT_STRIDE,
         ge=1,
         description="Run inference every N frames.",
     )
     vote_radius: int = Field(
-        default=3,
+        default=DEFAULT_VOTE_RADIUS,
         ge=0,
         description=(
             "Majority-vote occupancy at each inference anchor f using 2*R+1 frames spaced "
@@ -80,15 +89,15 @@ class StartInferenceRequest(BaseModel):
         ),
     )
     vote_frame_step: int = Field(
-        default=15,
+        default=DEFAULT_VOTE_FRAME_STEP,
         ge=1,
         description=(
             "Spacing in frames between samples in a vote window. "
-            "With R=3, step=12: anchor f samples f-36, f-24, f-12, f, f+12, f+24, f+36."
+            "With R=3, step=15: anchor f samples f-45, f-30, f-15, f, f+15, f+30, f+45."
         ),
     )
     publish_every: int = Field(
-        default=1,
+        default=DEFAULT_PUBLISH_EVERY,
         ge=1,
         description="Write one JSON event every N inferences.",
     )
@@ -98,13 +107,13 @@ class StartInferenceRequest(BaseModel):
         description="Stop after M frames (optional).",
     )
     conf: float = Field(
-        default=0.1,
+        default=DEFAULT_CONF,
         ge=0.0,
         le=1.0,
         description="Detection confidence threshold.",
     )
     iou: float = Field(
-        default=0.7,
+        default=DEFAULT_IOU,
         ge=0.0,
         le=1.0,
         description="IoU threshold.",

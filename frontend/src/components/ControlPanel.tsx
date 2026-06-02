@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getSessionRegions, getSessions, startInference, stopInference } from '../api/client'
 import type { InferenceState, ParkingRegion } from '../types'
+import { INFERENCE_DEFAULTS } from '../constants'
 import { RegionSelector } from './RegionSelector'
 
 interface ControlPanelProps {
@@ -11,11 +12,11 @@ interface ControlPanelProps {
 export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
   const [sessions, setSessions] = useState<string[]>([])
   const [selected, setSelected] = useState('')
-  const [stride, setStride] = useState(120)
-  const [voteRadius, setVoteRadius] = useState(3)
-  const [voteFrameStep, setVoteFrameStep] = useState(15)
-  const [conf, setConf] = useState(0.1)
-  const [iou, setIou] = useState(0.7)
+  const [stride, setStride] = useState<number>(INFERENCE_DEFAULTS.stride)
+  const [voteRadius, setVoteRadius] = useState<number>(INFERENCE_DEFAULTS.voteRadius)
+  const [voteFrameStep, setVoteFrameStep] = useState<number>(INFERENCE_DEFAULTS.voteFrameStep)
+  const [conf, setConf] = useState<number>(INFERENCE_DEFAULTS.conf)
+  const [iou, setIou] = useState<number>(INFERENCE_DEFAULTS.iou)
   const [error, setError] = useState<string | null>(null)
 
   const [regions, setRegions] = useState<ParkingRegion[]>([])
@@ -72,7 +73,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
         stride,
         vote_radius: voteRadius,
         vote_frame_step: voteFrameStep,
-        publish_every: 1,
+        publish_every: INFERENCE_DEFAULTS.publishEvery,
         conf,
         iou,
         ...(keptRegions ? { regions: keptRegions } : {}),

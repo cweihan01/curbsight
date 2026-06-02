@@ -43,6 +43,14 @@ from typing import Any, Callable, TextIO
 import cv2
 from ultralytics.solutions.solutions import SolutionResults
 
+from constants import (
+    DEFAULT_CONF,
+    DEFAULT_IOU,
+    DEFAULT_PUBLISH_EVERY,
+    DEFAULT_STRIDE,
+    DEFAULT_VOTE_FRAME_STEP,
+    DEFAULT_VOTE_RADIUS,
+)
 from parking_metrics import (
     PerSpotMetricsAccumulator,
     ValidationStats,
@@ -212,14 +220,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--conf",
         type=float,
-        default=0.1,
-        help="Detection confidence threshold (default: 0.1).",
+        default=DEFAULT_CONF,
+        help=f"Detection confidence threshold (default: {DEFAULT_CONF}).",
     )
     p.add_argument(
         "--iou",
         type=float,
-        default=0.7,
-        help="IoU threshold (default: 0.7).",
+        default=DEFAULT_IOU,
+        help=f"IoU threshold (default: {DEFAULT_IOU}).",
     )
     p.add_argument(
         "--classes",
@@ -239,9 +247,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--stride",
         type=int,
-        default=120,
+        default=DEFAULT_STRIDE,
         metavar="N",
-        help="Run the model every N frames (default: 120), i.e. an inference is run every "
+        help=f"Run the model every N frames (default: {DEFAULT_STRIDE}), i.e. an inference is run every "
         "N frames. Between inferences, the last annotated frame from the previous inference "
         "is duplicated so the output video length and FPS match the input.",
     )
@@ -261,9 +269,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--publish-every",
         type=int,
-        default=1,
+        default=DEFAULT_PUBLISH_EVERY,
         metavar="N",
-        help="Write one event every N inferences (default: 1). If used with --stride <X>, "
+        help=f"Write one event every N inferences (default: {DEFAULT_PUBLISH_EVERY}). If used with --stride <X>, "
         "the event will be written every X*Nth frame.",
     )
     p.add_argument(
@@ -275,19 +283,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--vote-radius",
         type=int,
-        default=3,
+        default=DEFAULT_VOTE_RADIUS,
         metavar="R",
         help="At each inference anchor f, majority-vote using (2*R+1) frames "
-        "spaced --vote-frame-step apart (default: R=3). Disabled if --stride is too "
+        f"spaced --vote-frame-step apart (default: R={DEFAULT_VOTE_RADIUS}). Disabled if --stride is too "
         "small for non-overlapping windows (needs stride > 2*R*step). Use 0 to disable.",
     )
     p.add_argument(
         "--vote-frame-step",
         type=int,
-        default=15,
+        default=DEFAULT_VOTE_FRAME_STEP,
         metavar="S",
-        help="Spacing in frames between samples in a vote window (default: 15). "
-        "With R=3, anchor f samples f-45, f-30, f-15, f, f+15, f+30, f+45.",
+        help=f"Spacing in frames between samples in a vote window (default: {DEFAULT_VOTE_FRAME_STEP}). "
+        "Example: With R=3, anchor f samples f-45, f-30, f-15, f, f+15, f+30, f+45.",
     )
     val = p.add_argument_group("validation (optional)")
     val.add_argument(
@@ -330,18 +338,18 @@ def run_parking_management(
     weights: str = DEFAULT_WEIGHTS,
     out_path: Path | None = None,
     overwrite: bool = False,
-    conf: float = 0.1,
-    iou: float = 0.7,
+    conf: float = DEFAULT_CONF,
+    iou: float = DEFAULT_IOU,
     classes_csv: str = "",
     no_verbose: bool = False,
     show: bool = False,
-    stride: int = 120,
+    stride: int = DEFAULT_STRIDE,
     max_frames: int | None = None,
     events_out_path: Path | None = None,
-    publish_every: int = 1,
+    publish_every: int = DEFAULT_PUBLISH_EVERY,
     inferred_frames_dir: Path | None = None,
-    vote_radius: int = 3,
-    vote_frame_step: int = 15,
+    vote_radius: int = DEFAULT_VOTE_RADIUS,
+    vote_frame_step: int = DEFAULT_VOTE_FRAME_STEP,
     session_id: str | None = None,
     gt_path: Path | None = None,
     metrics_out: Path | None = None,
