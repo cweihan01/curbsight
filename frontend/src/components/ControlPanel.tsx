@@ -1,13 +1,5 @@
-import { useEffect, useState } from 'react'
-import { getSessionRegions, getSessions, startInference, stopInference } from '../api/client'
-import type { InferenceState, ParkingRegion } from '../types'
-import { INFERENCE_DEFAULTS } from '../constants'
+import { useControl } from '../context/ControlContext'
 import { RegionSelector } from './RegionSelector'
-
-interface ControlPanelProps {
-  status: InferenceState
-  notifyStart: (sessionId: string) => void
-}
 
 function TooltipLabel({ label, tip }: { label: string; tip: string }) {
   return (
@@ -25,150 +17,38 @@ function TooltipLabel({ label, tip }: { label: string; tip: string }) {
   )
 }
 
-export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
-  const [sessions, setSessions] = useState<string[]>([])
-  const [selected, setSelected] = useState('')
-  const [stride, setStride] = useState<string>(String(INFERENCE_DEFAULTS.stride))
-  const [voteRadius, setVoteRadius] = useState<string>(String(INFERENCE_DEFAULTS.voteRadius))
-  const [voteFrameStep, setVoteFrameStep] = useState<string>(String(INFERENCE_DEFAULTS.voteFrameStep))
-  const [conf, setConf] = useState<string>(String(INFERENCE_DEFAULTS.conf))
-  const [iou, setIou] = useState<string>(String(INFERENCE_DEFAULTS.iou))
-  const [error, setError] = useState<string | null>(null)
-
-  const [regions, setRegions] = useState<ParkingRegion[]>([])
-  const [selectedIndices, setSelectedIndices] = useState<number[]>([])
-  const [showSelector, setShowSelector] = useState(false)
-
-  const isRunning = status === 'running' || status === 'started'
-  const isStarting = status === 'started'
-
-  function parseNumberField(
-    raw: string,
-    {
-      name,
-      min,
-      max,
-      integer = false,
-    }: { name: string; min: number; max?: number; integer?: boolean },
-  ): number {
-    const value = raw.trim()
-    if (!value) throw new Error(`${name} is required.`)
-    const n = Number(value)
-    if (!Number.isFinite(n)) throw new Error(`${name} must be a valid number.`)
-    if (integer && !Number.isInteger(n)) throw new Error(`${name} must be an integer.`)
-    if (n < min) throw new Error(`${name} must be >= ${min}.`)
-    if (max !== undefined && n > max) throw new Error(`${name} must be <= ${max}.`)
-    return n
-  }
-
-  function normalizeOnBlur(
-    raw: string,
-    setter: (v: string) => void,
-    fallback: number,
-    opts: { min: number; max?: number; integer?: boolean },
-  ) {
-    try {
-      const n = parseNumberField(raw, { name: 'Value', ...opts })
-      setter(opts.integer ? String(Math.trunc(n)) : String(n))
-    } catch {
-      setter(String(fallback))
-    }
-  }
-
-  useEffect(() => {
-    getSessions()
-      .then((ids) => {
-        setSessions(ids)
-        if (ids.length > 0) setSelected(ids[0])
-      })
-      .catch(() => setError('Could not load sessions — is the backend running?'))
-  }, [])
-
-  useEffect(() => {
-    if (!selected) {
-      setRegions([])
-      setSelectedIndices([])
-      return
-    }
-    let cancelled = false
-    getSessionRegions(selected)
-      .then((regs) => {
-        if (cancelled) return
-        setRegions(regs)
-        setSelectedIndices(regs.map((_, i) => i))
-      })
-      .catch(() => {
-        if (cancelled) return
-        setRegions([])
-        setSelectedIndices([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selected])
-
-  async function handleStart() {
-    if (!selected) return
-    if (regions.length > 0 && selectedIndices.length === 0) {
-      setError('Select at least one parking box before starting.')
-      return
-    }
-    setError(null)
-    const keptRegions =
-      regions.length > 0 ? selectedIndices.map((i) => regions[i]) : undefined
-    let strideValue: number
-    let voteRadiusValue: number
-    let voteFrameStepValue: number
-    let confValue: number
-    let iouValue: number
-    try {
-      strideValue = parseNumberField(stride, { name: 'Stride', min: 1, integer: true })
-      voteRadiusValue = parseNumberField(voteRadius, { name: 'Vote radius', min: 0, integer: true })
-      voteFrameStepValue = parseNumberField(voteFrameStep, {
-        name: 'Vote step',
-        min: 1,
-        integer: true,
-      })
-      confValue = parseNumberField(conf, { name: 'Conf', min: 0, max: 1 })
-      iouValue = parseNumberField(iou, { name: 'IoU', min: 0, max: 1 })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid inference parameters.')
-      return
-    }
-    try {
-      await startInference({
-        session_id: selected,
-        stride: strideValue,
-        vote_radius: voteRadiusValue,
-        vote_frame_step: voteFrameStepValue,
-        publish_every: INFERENCE_DEFAULTS.publishEvery,
-        conf: confValue,
-        iou: iouValue,
-        ...(keptRegions ? { regions: keptRegions } : {}),
-      })
-      notifyStart(selected)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start inference')
-    }
-  }
-
-  async function handleStop() {
-    setError(null)
-    try {
-      await stopInference()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to stop inference')
-    }
-  }
-
-  function resetParamsToDefault() {
-    setStride(String(INFERENCE_DEFAULTS.stride))
-    setVoteRadius(String(INFERENCE_DEFAULTS.voteRadius))
-    setVoteFrameStep(String(INFERENCE_DEFAULTS.voteFrameStep))
-    setConf(String(INFERENCE_DEFAULTS.conf))
-    setIou(String(INFERENCE_DEFAULTS.iou))
-    setError(null)
-  }
+export function ControlPanel() {
+  const {
+    sessions,
+    selected,
+    setSelected,
+    stride,
+    setStride,
+    voteRadius,
+    setVoteRadius,
+    voteFrameStep,
+    setVoteFrameStep,
+    conf,
+    setConf,
+    iou,
+    setIou,
+    regions,
+    selectedIndices,
+    setSelectedIndices,
+    showSelector,
+    setShowSelector,
+    error,
+    isRunning,
+    isStarting,
+    normalizeStride,
+    normalizeVoteRadius,
+    normalizeVoteFrameStep,
+    normalizeConf,
+    normalizeIou,
+    resetParamsToDefault,
+    handleStart,
+    handleStop,
+  } = useControl()
 
   return (
     <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-4">
@@ -219,12 +99,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             inputMode="numeric"
             value={stride}
             onChange={(e) => setStride(e.target.value)}
-            onBlur={() =>
-              normalizeOnBlur(stride, setStride, INFERENCE_DEFAULTS.stride, {
-                min: 1,
-                integer: true,
-              })
-            }
+            onBlur={normalizeStride}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />
@@ -239,12 +114,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             inputMode="numeric"
             value={voteRadius}
             onChange={(e) => setVoteRadius(e.target.value)}
-            onBlur={() =>
-              normalizeOnBlur(voteRadius, setVoteRadius, INFERENCE_DEFAULTS.voteRadius, {
-                min: 0,
-                integer: true,
-              })
-            }
+            onBlur={normalizeVoteRadius}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />
@@ -259,12 +129,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             inputMode="numeric"
             value={voteFrameStep}
             onChange={(e) => setVoteFrameStep(e.target.value)}
-            onBlur={() =>
-              normalizeOnBlur(voteFrameStep, setVoteFrameStep, INFERENCE_DEFAULTS.voteFrameStep, {
-                min: 1,
-                integer: true,
-              })
-            }
+            onBlur={normalizeVoteFrameStep}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />
@@ -279,12 +144,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             inputMode="decimal"
             value={conf}
             onChange={(e) => setConf(e.target.value)}
-            onBlur={() =>
-              normalizeOnBlur(conf, setConf, INFERENCE_DEFAULTS.conf, {
-                min: 0,
-                max: 1,
-              })
-            }
+            onBlur={normalizeConf}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />
@@ -299,12 +159,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
             inputMode="decimal"
             value={iou}
             onChange={(e) => setIou(e.target.value)}
-            onBlur={() =>
-              normalizeOnBlur(iou, setIou, INFERENCE_DEFAULTS.iou, {
-                min: 0,
-                max: 1,
-              })
-            }
+            onBlur={normalizeIou}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />
@@ -328,7 +183,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
 
       <div className="flex gap-3">
         <button
-          onClick={handleStart}
+          onClick={() => void handleStart()}
           disabled={isRunning || !selected}
           className="flex-1 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
         >
@@ -338,7 +193,7 @@ export function ControlPanel({ status, notifyStart }: ControlPanelProps) {
           {isStarting ? 'Starting...' : 'Start'}
         </button>
         <button
-          onClick={handleStop}
+          onClick={() => void handleStop()}
           disabled={!isRunning}
           className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg py-2 text-sm font-medium transition-colors"
         >

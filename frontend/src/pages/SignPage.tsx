@@ -1,19 +1,15 @@
-import { useInferenceSocket } from '../hooks/useInferenceSocket'
-import { useFramePlayer } from '../hooks/useFramePlayer'
+import { useInference } from '../context/InferenceContext'
 import { ControlPanel } from '../components/ControlPanel'
 import { FrameViewer } from '../components/FrameViewer'
 import { DriverSign } from '../components/DriverSign'
 
 export function SignPage() {
-  const { events, status, notifyStart } = useInferenceSocket()
-  const frame = useFramePlayer(events)
-
-  const isLoading = status === 'started' || (status === 'running' && frame.currentEvent === null)
+  const { frame, isLoading } = useInference()
 
   return (
     <div className="grid grid-cols-[280px_1fr_1fr] gap-6 flex-1 items-start">
       <aside className="flex flex-col gap-4">
-        <ControlPanel status={status} notifyStart={notifyStart} />
+        <ControlPanel />
       </aside>
 
       <FrameViewer
