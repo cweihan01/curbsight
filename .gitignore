@@ -21,5 +21,6 @@ runs/
 *.m4p
 
 # Parking Management output
+bounding_boxes_override.json
 *.jsonl
 inferred_frames/
