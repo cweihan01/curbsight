@@ -44,8 +44,8 @@ export function FrameViewer({
   }, [showNav, onPrev, onNext, onLatest])
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-3 h-full min-h-0">
+      <div className="flex items-center justify-between gap-2 shrink-0">
         <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider">Live Frame</h2>
         {showNav && isLive && (
           <span className="text-xs font-medium text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">
@@ -54,7 +54,7 @@ export function FrameViewer({
         )}
       </div>
 
-      <div className="relative w-full aspect-video bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center">
+      <div className="relative flex-1 min-h-0 w-full bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center">
         {isLoading ? (
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-slate-600 border-t-green-400 rounded-full animate-spin" />
@@ -73,7 +73,7 @@ export function FrameViewer({
       </div>
 
       {showNav && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 shrink-0">
           <input
             type="range"
             min={0}
@@ -104,20 +104,25 @@ export function FrameViewer({
               Next →
             </button>
           </div>
-          {!isLive && (
-            <button
-              type="button"
-              onClick={onLatest}
-              className="w-full py-1.5 text-sm rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-600/30"
-            >
-              Jump to live
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onLatest}
+            disabled={isLive}
+            aria-hidden={isLive}
+            tabIndex={isLive ? -1 : 0}
+            className={`w-full py-1.5 text-sm rounded-lg border transition-colors ${
+              isLive
+                ? 'invisible border-transparent'
+                : 'bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-600/30'
+            }`}
+          >
+            Jump to live
+          </button>
         </div>
       )}
 
       {currentEvent && !isLoading && (
-        <p className="text-slate-600 text-xs">
+        <p className="text-slate-600 text-xs shrink-0">
           Frame {currentEvent.frame_index} · Inference {currentEvent.inference_index} ·{' '}
           {currentEvent.timestamp_iso.slice(11, 19)}
         </p>
