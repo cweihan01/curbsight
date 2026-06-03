@@ -1,19 +1,8 @@
-interface Row {
-  location: string
-  available: number | null
-  isLive: boolean
-}
+import type { StreetSignRow } from '../hooks/useStreetSignBoard'
 
-interface Props {
-  availableSpots: number | null
-  totalSpots: number | null
-  isLoading: boolean
+interface DriverSignProps {
+  rows: StreetSignRow[]
 }
-
-const DUMMY_ROWS: Row[] = [
-  { location: 'Gayley & Kinross', available: 8, isLive: false },
-  { location: 'Westwood & Lindbrook', available: 22, isLive: false },
-]
 
 function spotColor(available: number | null, isLoading: boolean): string {
   if (isLoading || available === null) return '#6b7280'
@@ -25,23 +14,28 @@ function spotColor(available: number | null, isLoading: boolean): string {
 function SpotCount({ available, isLoading }: { available: number | null; isLoading: boolean }) {
   const color = spotColor(available, isLoading)
   if (isLoading) {
-    return <span style={{ color, fontFamily: 'monospace' }} className="text-2xl font-bold tracking-widest">--</span>
+    return (
+      <span
+        style={{ color, fontFamily: 'monospace' }}
+        className="text-2xl font-bold tracking-widest"
+      >
+        --
+      </span>
+    )
   }
   return (
-    <span style={{ color, fontFamily: 'monospace' }} className="text-2xl font-bold tabular-nums tracking-widest">
+    <span
+      style={{ color, fontFamily: 'monospace' }}
+      className="text-2xl font-bold tabular-nums tracking-widest"
+    >
       {available ?? '--'}
     </span>
   )
 }
 
-export function DriverSign({ availableSpots, totalSpots, isLoading }: Props) {
-  const liveRow: Row = {
-    location: 'Le Conte & Westwood Blvd',
-    available: availableSpots,
-    isLive: true,
-  }
-
-  const rows = [liveRow, ...DUMMY_ROWS]
+export function DriverSign({ rows }: DriverSignProps) {
+  const liveRow = rows.find((r) => r.isLive)
+  const footerTotal = liveRow?.totalSpots ?? rows.find((r) => r.totalSpots !== null)?.totalSpots
 
   return (
     <div
@@ -53,7 +47,6 @@ export function DriverSign({ availableSpots, totalSpots, isLoading }: Props) {
         fontFamily: "'Courier New', Courier, monospace",
       }}
     >
-      {/* Header row */}
       <div
         className="flex items-center justify-between px-6 py-4"
         style={{ borderBottom: '2px solid #1a3a1a', background: '#0d220d' }}
@@ -82,14 +75,13 @@ export function DriverSign({ availableSpots, totalSpots, isLoading }: Props) {
           className="text-xs font-bold tracking-widest uppercase"
           style={{ color: '#22543d', letterSpacing: '0.2em' }}
         >
-          OPEN
+          {liveRow ? 'LIVE' : 'OPEN'}
         </span>
       </div>
 
-      {/* Rows */}
       {rows.map((row, i) => (
         <div
-          key={row.location}
+          key={row.streetId}
           className="flex items-center justify-between px-6 py-5"
           style={{
             borderBottom: i < rows.length - 1 ? '1px solid #112211' : undefined,
@@ -109,23 +101,21 @@ export function DriverSign({ availableSpots, totalSpots, isLoading }: Props) {
               className="text-base tracking-wide"
               style={{ color: '#86efac', letterSpacing: '0.05em' }}
             >
-              {row.location}
+              {row.displayName}
             </span>
           </div>
-          <SpotCount
-            available={row.isLive ? availableSpots : row.available}
-            isLoading={row.isLive && isLoading}
-          />
+          <SpotCount available={row.availableSpots} isLoading={row.isLoading} />
         </div>
       ))}
 
-      {/* Footer */}
       <div
         className="px-6 py-2 text-right"
         style={{ borderTop: '1px solid #112211' }}
       >
         <span className="text-xs" style={{ color: '#1a4a1a', letterSpacing: '0.1em' }}>
-          {totalSpots !== null ? `${totalSpots} TOTAL SPACES` : 'CURBSIGHT'}
+          {footerTotal != null
+            ? `${footerTotal} TOTAL SPACES${liveRow ? ' (LIVE)' : ''}`
+            : 'CURBSIGHT'}
         </span>
       </div>
     </div>

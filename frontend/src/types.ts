@@ -1,6 +1,8 @@
 export interface InferenceEvent {
   timestamp_iso: string
   session_id: string
+  street_id?: string
+  street_display_name?: string
   frame_index: number
   inference_index: number
   stride: number

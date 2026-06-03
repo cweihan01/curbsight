@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import lru_cache
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,6 +80,33 @@ DEFAULT_EVENTS_FILE = "parking_events.jsonl"
 DEFAULT_METRICS_FILE = "validation_metrics.json"
 
 OUTPUT_DIR_NAME = "output"
+STREETS_PATH = Path(__file__).resolve().parent / "data" / "streets.json"
+
+
+@lru_cache(maxsize=1)
+def _session_street_map() -> dict[str, tuple[str, str]]:
+    """session_id -> (street_id, street_display_name) from data/streets.json."""
+    if not STREETS_PATH.is_file():
+        return {}
+    raw = json.loads(STREETS_PATH.read_text(encoding="utf-8"))
+    mapping: dict[str, tuple[str, str]] = {}
+    for street in raw.get("streets", []):
+        street_id = street.get("id")
+        display_name = street.get("display_name")
+        if not street_id or not display_name:
+            continue
+        for session_id in street.get("sessions", []):
+            key = str(session_id).strip().replace("\\", "/")
+            if key:
+                mapping[key] = (str(street_id), str(display_name))
+    return mapping
+
+
+def resolve_street_for_session(session_id: str | None) -> tuple[str, str] | None:
+    if not session_id:
+        return None
+    key = session_id.strip().replace("\\", "/")
+    return _session_street_map().get(key)
 
 
 def source_output_dir(source: str, overwrite: bool = False) -> Path:
@@ -166,7 +194,8 @@ def build_inference_event(
     occupancy_ratio = occupied_spots / \
         total_spots if total_spots is not None and total_spots > 0 else None
 
-    return {
+    street = resolve_street_for_session(session_id)
+    event: dict[str, Any] = {
         "timestamp_iso": datetime.now(timezone.utc).isoformat(),
         "session_id": session_id,
         "frame_index": frame_index,
@@ -180,6 +209,9 @@ def build_inference_event(
         "inferred_image_path": inferred_image_path,
         "inferred_image_filename": inferred_image_filename,
     }
+    if street is not None:
+        event["street_id"], event["street_display_name"] = street
+    return event
 
 
 def parse_args() -> argparse.Namespace:

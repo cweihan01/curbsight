@@ -1,10 +1,18 @@
 import { useInference } from '../context/InferenceContext'
+import { useStreetSignBoard } from '../hooks/useStreetSignBoard'
 import { ControlPanel } from '../components/ControlPanel'
 import { FrameViewer } from '../components/FrameViewer'
 import { DriverSign } from '../components/DriverSign'
 
 export function SignPage() {
-  const { frame, isLoading } = useInference()
+  const { events, status, frame, isLoading } = useInference()
+  const signRows = useStreetSignBoard(
+    events,
+    status,
+    isLoading,
+    frame.currentIndex,
+    frame.isLive,
+  )
 
   return (
     <div className="grid grid-cols-[280px_1fr_1fr] gap-6 flex-1 items-start">
@@ -27,11 +35,7 @@ export function SignPage() {
         onLatest={frame.goLatest}
       />
 
-      <DriverSign
-        availableSpots={frame.currentEvent?.available_spots ?? null}
-        totalSpots={frame.currentEvent?.total_spots ?? null}
-        isLoading={isLoading}
-      />
+      <DriverSign rows={signRows} />
     </div>
   )
 }

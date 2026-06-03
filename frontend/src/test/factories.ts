@@ -4,6 +4,8 @@ export function makeEvent(overrides: Partial<InferenceEvent> = {}): InferenceEve
   return {
     timestamp_iso: '2026-05-18T17:00:00',
     session_id: 'test/session',
+    street_id: 'gayley',
+    street_display_name: 'Gayley Ave',
     frame_index: 0,
     inference_index: 0,
     stride: 30,

@@ -14,6 +14,11 @@ Contains short videos (30 sec-2 min) trimmed from full recordings, which can be 
 
 Contains full-length (untrimmed) recordings, which can be used to obtain accuracy metrics for validation. Each subfolder (e.g. `day/) contains the input and output files associated with a single clip.
 
+## Street labels (`streets.json`)
+
+Maps each `session_id` to a street row on the driver sign. New inference events include
+`street_id` and `street_display_name` when the session is listed there.
+
 ## Subfolder Structure
 
 Inputs (under `clipped/<subfolder>` and `full_length/<subfolder>`):
