@@ -14,7 +14,7 @@ function ratioColor(ratio: number): string {
 export function OccupancyGauge({ latest, isLoading }: Props) {
   if (!latest) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 flex flex-col items-center justify-center gap-2 min-h-[140px]">
+      <div className="bg-slate-800 rounded-xl p-4 flex flex-col items-center justify-center gap-2 min-h-[120px]">
         {isLoading ? (
           <>
             <div className="w-8 h-8 border-2 border-slate-600 border-t-green-400 rounded-full animate-spin" />
@@ -31,7 +31,7 @@ export function OccupancyGauge({ latest, isLoading }: Props) {
   const pct = Math.round(occupancy_ratio * 100)
 
   return (
-    <div className="bg-slate-800 rounded-xl p-6 flex flex-col gap-4">
+    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-4">
       <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider">Occupancy</h2>
       <div className="flex items-end gap-3">
         <span className={`text-5xl font-bold tabular-nums ${ratioColor(occupancy_ratio)}`}>

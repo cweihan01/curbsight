@@ -51,7 +51,7 @@ export function ControlPanel() {
   } = useControl()
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-4">
+    <div className="bg-slate-800 rounded-xl py-3 px-4 flex flex-col gap-3">
       <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider">Controls</h2>
 
       <div className="flex flex-col gap-2">

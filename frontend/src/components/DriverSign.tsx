@@ -48,7 +48,7 @@ export function DriverSign({ rows }: DriverSignProps) {
       }}
     >
       <div
-        className="flex items-center justify-between px-6 py-4"
+        className="flex items-center justify-between px-5 py-3"
         style={{ borderBottom: '2px solid #1a3a1a', background: '#0d220d' }}
       >
         <div className="flex items-center gap-3">
@@ -82,7 +82,7 @@ export function DriverSign({ rows }: DriverSignProps) {
       {rows.map((row, i) => (
         <div
           key={row.streetId}
-          className="flex items-center justify-between px-6 py-5"
+          className="flex items-center justify-between px-5 py-4"
           style={{
             borderBottom: i < rows.length - 1 ? '1px solid #112211' : undefined,
             background: i % 2 === 0 ? 'transparent' : 'rgba(74,222,128,0.02)',
@@ -109,7 +109,7 @@ export function DriverSign({ rows }: DriverSignProps) {
       ))}
 
       <div
-        className="px-6 py-2 text-right"
+        className="px-5 py-1.5 text-right"
         style={{ borderTop: '1px solid #112211' }}
       >
         <span className="text-xs" style={{ color: '#1a4a1a', letterSpacing: '0.1em' }}>

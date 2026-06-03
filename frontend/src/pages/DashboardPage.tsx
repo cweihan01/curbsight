@@ -8,12 +8,12 @@ export function DashboardPage() {
   const { frame, isLoading } = useInference()
 
   return (
-    <div className="grid grid-cols-[280px_1fr] gap-6 flex-1">
-      <aside className="flex flex-col gap-4">
+    <div className="grid grid-cols-[280px_1fr] gap-4">
+      <aside className="flex flex-col gap-3">
         <ControlPanel />
       </aside>
-      <main className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-4">
+      <main className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <FrameViewer
             currentFrame={frame.currentFrame}
             currentEvent={frame.currentEvent}

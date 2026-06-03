@@ -15,8 +15,8 @@ export function SignPage() {
   )
 
   return (
-    <div className="grid grid-cols-[280px_1fr_1fr] gap-6 flex-1 items-start">
-      <aside className="flex flex-col gap-4">
+    <div className="grid grid-cols-[280px_1fr_1fr] gap-4 items-start">
+      <aside className="flex flex-col gap-3">
         <ControlPanel />
       </aside>
 

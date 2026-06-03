@@ -24,7 +24,7 @@ export function OccupancyChart({ events, isLoading }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-slate-800 rounded-xl p-6 flex items-center justify-center min-h-[200px]">
+      <div className="bg-slate-800 rounded-xl p-4 flex items-center justify-center min-h-[140px]">
         <p className="text-slate-500 text-sm">
           {isLoading ? 'Waiting for first event...' : 'No data yet'}
         </p>
@@ -33,11 +33,11 @@ export function OccupancyChart({ events, isLoading }: Props) {
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl p-6">
-      <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-4">
+    <div className="bg-slate-800 rounded-xl p-4">
+      <h2 className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">
         Occupancy Over Time
       </h2>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis
