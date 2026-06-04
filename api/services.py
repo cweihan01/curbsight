@@ -280,6 +280,7 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         events_out_path=events_out_path,
         publish_every=req.publish_every,
         inferred_frames_dir=inferred_frames_dir,
+        no_video=True,  # video output not needed; only use inferred frames
     )
 
 

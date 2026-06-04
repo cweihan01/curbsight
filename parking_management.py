@@ -548,11 +548,8 @@ def run_parking_management(
     index = 0
     infer_count = 0
     progress_every = max(1, int(round(fps * 5)))
+    seek_frames = no_video and stride > 1
     try:
-        # TODO: We can probably optimize this by advancing the frame index by the stride,
-        # instead of reading each frame sequentially; depends on whether we need the
-        # output video to match the input video length
-
         # Main loop for each frame in the input video
         while cap.isOpened():
             # Check if the run should stop based on the optional callback
@@ -560,11 +557,19 @@ def run_parking_management(
                 break
 
             # Read the next frame from the input video
+            # Advance the frame index by the stride if we are seeking frames,
+            # otherwise read the next frame sequentially
+            if seek_frames:
+                if frame_count > 0 and index >= frame_count:
+                    break
+                cap.set(cv2.CAP_PROP_POS_FRAMES, index)
             ret, im0 = cap.read()
             if not ret:
                 break
 
-            run_inference = index % stride == 0 or (not no_video and last_plot is None)
+            run_inference = seek_frames or index % stride == 0 or (
+                not no_video and last_plot is None
+            )
             if run_inference:
                 results = parking.process(
                     im0,
@@ -640,7 +645,7 @@ def run_parking_management(
             if writer is not None and last_plot is not None:
                 writer.write(last_plot)
 
-            index += 1
+            index += stride if seek_frames else 1
             if index % progress_every == 0:
                 if frame_count > 0:
                     pct = (index / frame_count) * 100
