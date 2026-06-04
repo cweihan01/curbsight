@@ -51,6 +51,9 @@ class VotingParkingManagement(solutions.ParkingManagement):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._last_region_occupied: list[bool] | None = None
+        # For some reason, in the base class, red means available and green means occupied,
+        # but it's more intuitive to have green mean available and red mean occupied
+        self.occ, self.arc = self.arc, self.occ
 
     @property
     def last_region_occupied(self) -> list[bool] | None:
