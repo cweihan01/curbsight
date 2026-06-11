@@ -270,7 +270,6 @@ def run_inference_process(req_data: dict[str, object]) -> None:
         out_path=out_path,
         overwrite=True,
         conf=req.conf,
-        iou=req.iou,
         no_verbose=True,
         stride=req.stride,
         vote_radius=req.vote_radius,

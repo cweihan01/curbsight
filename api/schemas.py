@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from constants import (
     DEFAULT_CONF,
-    DEFAULT_IOU,
     DEFAULT_PUBLISH_EVERY,
     DEFAULT_STRIDE,
     DEFAULT_VOTE_FRAME_STEP,
@@ -111,12 +110,6 @@ class StartInferenceRequest(BaseModel):
         ge=0.0,
         le=1.0,
         description="Detection confidence threshold.",
-    )
-    iou: float = Field(
-        default=DEFAULT_IOU,
-        ge=0.0,
-        le=1.0,
-        description="IoU threshold.",
     )
 
     @model_validator(mode="after")

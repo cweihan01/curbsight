@@ -41,6 +41,5 @@ export interface StartInferenceRequest {
   publish_every: number
   max_frames?: number
   conf: number
-  iou: number
   regions?: ParkingRegion[]
 }

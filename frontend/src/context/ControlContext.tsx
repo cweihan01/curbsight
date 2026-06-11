@@ -57,8 +57,6 @@ interface ControlContextValue {
   setVoteFrameStep: (v: string) => void
   conf: string
   setConf: (v: string) => void
-  iou: string
-  setIou: (v: string) => void
   regions: ParkingRegion[]
   selectedIndices: number[]
   setSelectedIndices: (indices: number[]) => void
@@ -71,7 +69,6 @@ interface ControlContextValue {
   normalizeVoteRadius: () => void
   normalizeVoteFrameStep: () => void
   normalizeConf: () => void
-  normalizeIou: () => void
   resetParamsToDefault: () => void
   handleStart: () => Promise<void>
   handleStop: () => Promise<void>
@@ -88,7 +85,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
   const [voteRadius, setVoteRadius] = useState(String(INFERENCE_DEFAULTS.voteRadius))
   const [voteFrameStep, setVoteFrameStep] = useState(String(INFERENCE_DEFAULTS.voteFrameStep))
   const [conf, setConf] = useState(String(INFERENCE_DEFAULTS.conf))
-  const [iou, setIou] = useState(String(INFERENCE_DEFAULTS.iou))
   const [error, setError] = useState<string | null>(null)
 
   const [regions, setRegions] = useState<ParkingRegion[]>([])
@@ -143,7 +139,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
     let voteRadiusValue: number
     let voteFrameStepValue: number
     let confValue: number
-    let iouValue: number
     try {
       strideValue = parseNumberField(stride, { name: 'Stride', min: 1, integer: true })
       voteRadiusValue = parseNumberField(voteRadius, { name: 'Vote radius', min: 0, integer: true })
@@ -153,7 +148,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
         integer: true,
       })
       confValue = parseNumberField(conf, { name: 'Conf', min: 0, max: 1 })
-      iouValue = parseNumberField(iou, { name: 'IoU', min: 0, max: 1 })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid inference parameters.')
       return
@@ -166,7 +160,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
         vote_frame_step: voteFrameStepValue,
         publish_every: INFERENCE_DEFAULTS.publishEvery,
         conf: confValue,
-        iou: iouValue,
         ...(keptRegions ? { regions: keptRegions } : {}),
       })
       notifyStart(selected)
@@ -181,7 +174,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
     voteRadius,
     voteFrameStep,
     conf,
-    iou,
     notifyStart,
   ])
 
@@ -199,7 +191,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
     setVoteRadius(String(INFERENCE_DEFAULTS.voteRadius))
     setVoteFrameStep(String(INFERENCE_DEFAULTS.voteFrameStep))
     setConf(String(INFERENCE_DEFAULTS.conf))
-    setIou(String(INFERENCE_DEFAULTS.iou))
     setError(null)
   }, [])
 
@@ -216,8 +207,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
       setVoteFrameStep,
       conf,
       setConf,
-      iou,
-      setIou,
       regions,
       selectedIndices,
       setSelectedIndices,
@@ -240,8 +229,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
         }),
       normalizeConf: () =>
         normalizeOnBlur(conf, setConf, INFERENCE_DEFAULTS.conf, { min: 0, max: 1 }),
-      normalizeIou: () =>
-        normalizeOnBlur(iou, setIou, INFERENCE_DEFAULTS.iou, { min: 0, max: 1 }),
       resetParamsToDefault,
       handleStart,
       handleStop,
@@ -253,7 +240,6 @@ export function ControlProvider({ children }: { children: ReactNode }) {
       voteRadius,
       voteFrameStep,
       conf,
-      iou,
       regions,
       selectedIndices,
       showSelector,

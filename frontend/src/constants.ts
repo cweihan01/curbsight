@@ -13,5 +13,4 @@ export const INFERENCE_DEFAULTS = {
   voteFrameStep: 15,
   publishEvery: 1,
   conf: 0.1,
-  iou: 0.7,
 } as const

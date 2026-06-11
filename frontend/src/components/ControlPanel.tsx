@@ -30,8 +30,6 @@ export function ControlPanel() {
     setVoteFrameStep,
     conf,
     setConf,
-    iou,
-    setIou,
     regions,
     selectedIndices,
     setSelectedIndices,
@@ -44,7 +42,6 @@ export function ControlPanel() {
     normalizeVoteRadius,
     normalizeVoteFrameStep,
     normalizeConf,
-    normalizeIou,
     resetParamsToDefault,
     handleStart,
     handleStop,
@@ -145,21 +142,6 @@ export function ControlPanel() {
             value={conf}
             onChange={(e) => setConf(e.target.value)}
             onBlur={normalizeConf}
-            disabled={isRunning}
-            className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <TooltipLabel
-            label="IoU"
-            tip="Overlap threshold in range [0, 1]. Higher IoU keeps more overlapping detections; lower IoU suppresses duplicates more aggressively."
-          />
-          <input
-            type="text"
-            inputMode="decimal"
-            value={iou}
-            onChange={(e) => setIou(e.target.value)}
-            onBlur={normalizeIou}
             disabled={isRunning}
             className="bg-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-600 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           />

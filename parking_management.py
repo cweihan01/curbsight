@@ -46,7 +46,6 @@ from ultralytics.solutions.solutions import SolutionResults
 
 from constants import (
     DEFAULT_CONF,
-    DEFAULT_IOU,
     DEFAULT_PUBLISH_EVERY,
     DEFAULT_STRIDE,
     DEFAULT_VOTE_FRAME_STEP,
@@ -256,12 +255,6 @@ def parse_args() -> argparse.Namespace:
         help=f"Detection confidence threshold (default: {DEFAULT_CONF}).",
     )
     p.add_argument(
-        "--iou",
-        type=float,
-        default=DEFAULT_IOU,
-        help=f"IoU threshold (default: {DEFAULT_IOU}).",
-    )
-    p.add_argument(
         "--classes",
         default="",
         help='Comma-separated COCO class ids to track, e.g. "2,3,5,7" for vehicles. Empty = all.',
@@ -371,7 +364,6 @@ def run_parking_management(
     out_path: Path | None = None,
     overwrite: bool = False,
     conf: float = DEFAULT_CONF,
-    iou: float = DEFAULT_IOU,
     classes_csv: str = "",
     no_verbose: bool = False,
     show: bool = False,
@@ -529,7 +521,6 @@ def run_parking_management(
         "model": weights,
         "json_file": str(json_path),
         "conf": conf,
-        "iou": iou,
         "verbose": not no_verbose,
         "show": show,
     }
@@ -537,7 +528,7 @@ def run_parking_management(
         pm_kwargs["classes"] = classes
 
     print(
-        f"[parking] Config: stride={stride}, conf={conf}, iou={iou}, "
+        f"[parking] Config: stride={stride}, conf={conf}, "
         f"weights={weights}, json={json_path}, vote_radius={vote_radius}, "
         f"vote_frame_step={vote_frame_step}"
     )
@@ -716,7 +707,6 @@ def main() -> int:
         out_path=args.out,
         overwrite=args.overwrite,
         conf=args.conf,
-        iou=args.iou,
         classes_csv=args.classes,
         no_verbose=args.no_verbose,
         show=args.show,
